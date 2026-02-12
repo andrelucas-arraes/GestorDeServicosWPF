@@ -1,0 +1,20 @@
+<Application x:Class="GestaoAulas.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:GestaoAulas">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Dark.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Primary/MaterialDesignColor.Blue.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/MaterialDesignColors;component/Themes/Recommended/Accent/MaterialDesignColor.Blue.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Customização para restaurar visual "GitHub Dark" original (#0d1117) -->
+            <SolidColorBrush x:Key="MaterialDesignPaper" Color="#0d1117"/>
+            <SolidColorBrush x:Key="MaterialDesignBackground" Color="#0d1117"/>
+            <SolidColorBrush x:Key="MaterialDesignBody" Color="#e6edf3"/>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

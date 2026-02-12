@@ -1,0 +1,70 @@
+## Complete .gitignore for WPF/C# Projects
+
+# --- Build results ---
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][In][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# --- Project Specific Outpus ---
+publish/
+publish_portable/
+Export/
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# --- Visual Studio ---
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.rsuser
+*.cache
+*.opendb
+*.db-shm
+*.db-wal
+
+# --- MSTest / Unit Testing ---
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# --- VS Code ---
+.vscode/
+*.code-workspace
+
+# --- JetBrains (Rider / ReSharper) ---
+.idea/
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# --- NuGet ---
+*.nupkg
+*.snupkg
+# NuGet.config (Keep if it has sources, but manually remove secrets)
+
+# --- Databases ---
+*.db
+*.sqlitedb
+*.sqlite
+
+# --- Mono / Xamarin ---
+*.userprefs
+mono_crash.*
+
+# --- OS Specific ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.bak
+*~

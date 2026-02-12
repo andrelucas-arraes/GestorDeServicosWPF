@@ -1,0 +1,175 @@
+<Window x:Class="GestaoAulas.Views.AulaDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Title="Editar Serviço/Aula"
+        Height="450" Width="550"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        Background="{DynamicResource MaterialDesignPaper}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        TextOptions.TextFormattingMode="Ideal"
+        FontFamily="{DynamicResource MaterialDesignFont}">
+
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Título -->
+        <TextBlock Grid.Row="0"
+                   Text="Detalhes do Serviço"
+                   Style="{StaticResource MaterialDesignHeadline5TextBlock}"
+                   Margin="0,0,0,24"/>
+
+        <!-- Formulário -->
+        <Grid Grid.Row="1" VerticalAlignment="Top">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Data e Dia -->
+
+             <TextBox x:Name="txtData"
+                     Grid.Row="0" Grid.Column="0"
+                     Margin="0,0,8,20"
+                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                     materialDesign:HintAssist.Hint="Data (DD/MM/AAAA)"
+                     materialDesign:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+                     MaxLength="10"/>
+
+             <ComboBox x:Name="cmbCategoria"
+                       Grid.Row="0" Grid.Column="1"
+                       Margin="4,0,4,20"
+                       Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                       materialDesign:HintAssist.Hint="Categoria"
+                       SelectedValue="{Binding Categoria, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                       SelectedValuePath="Content">
+                 <ComboBoxItem Content="Aula"/>
+                 <ComboBoxItem Content="Serviço"/>
+                 <ComboBoxItem Content="Freelance"/>
+                 <ComboBoxItem Content="Manutenção"/>
+                 <ComboBoxItem Content="Outro"/>
+             </ComboBox>
+ 
+             <TextBox x:Name="txtDiaSemana"
+                      Grid.Row="0" Grid.Column="2"
+                      Margin="4,0,0,20"
+                      Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                      materialDesign:HintAssist.Hint="Dia"
+                      Text="{Binding DiaSemana}"
+                      IsReadOnly="True"
+                      Focusable="False"/>
+ 
+             <!-- Nome/Aluno -->
+             <TextBox x:Name="txtNomeAula"
+                      Grid.Row="1" Grid.ColumnSpan="3"
+                      Margin="0,0,0,20"
+                      Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                      materialDesign:HintAssist.Hint="Descrição / Nome do Aluno"
+                      Text="{Binding NomeAula, Mode=TwoWay}"/>
+ 
+             <!-- Duração, Valor Hora e Total -->
+             <TextBox x:Name="txtDuracao"
+                      Grid.Row="2" Grid.Column="0"
+                      Margin="0,0,4,20"
+                      materialDesign:HintAssist.Hint="Duração (H:MM)"
+                      materialDesign:TextFieldAssist.CharacterCounterVisibility="Collapsed"
+                      MaxLength="5"
+                      PreviewTextInput="Duracao_PreviewTextInput"
+                      PreviewKeyDown="Duracao_PreviewKeyDown">
+                 <TextBox.Style>
+                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
+                         <Setter Property="Visibility" Value="Collapsed"/>
+                         <Style.Triggers>
+                             <DataTrigger Binding="{Binding IsAula}" Value="True">
+                                 <Setter Property="Visibility" Value="Visible"/>
+                             </DataTrigger>
+                         </Style.Triggers>
+                     </Style>
+                 </TextBox.Style>
+             </TextBox>
+ 
+             <TextBox x:Name="txtValorHora"
+                      Grid.Row="2" Grid.Column="1"
+                      Margin="4,0,4,20"
+                      materialDesign:HintAssist.Hint="R$ / Hora"
+                      Text="{Binding ValorHora, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                      ToolTip="Valor cobrado por hora nesta aula específica">
+                 <TextBox.Style>
+                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
+                         <Setter Property="Visibility" Value="Collapsed"/>
+                         <Style.Triggers>
+                             <DataTrigger Binding="{Binding IsAula}" Value="True">
+                                 <Setter Property="Visibility" Value="Visible"/>
+                             </DataTrigger>
+                         </Style.Triggers>
+                     </Style>
+                 </TextBox.Style>
+             </TextBox>
+ 
+             <TextBox x:Name="txtValor"
+                      Grid.Row="2" Grid.Column="2"
+                      Margin="4,0,0,20"
+                      materialDesign:HintAssist.Hint="Total (R$)"
+                      Text="{Binding Valor, StringFormat=N2, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                      FontWeight="Bold">
+                 <TextBox.Style>
+                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
+                         <Setter Property="IsReadOnly" Value="False"/>
+                         <Setter Property="Focusable" Value="True"/>
+                         <Style.Triggers>
+                             <DataTrigger Binding="{Binding IsAula}" Value="True">
+                                 <Setter Property="IsReadOnly" Value="True"/>
+                                 <Setter Property="Focusable" Value="False"/>
+                             </DataTrigger>
+                         </Style.Triggers>
+                     </Style>
+                 </TextBox.Style>
+             </TextBox>
+
+            <!-- Status -->
+            <ComboBox x:Name="cmbStatus"
+                      Grid.Row="3" Grid.ColumnSpan="3"
+                      Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                      materialDesign:HintAssist.Hint="Status do Pagamento"
+                      SelectedValuePath="Content"
+                      SelectedValue="{Binding Status, Mode=TwoWay}">
+                <ComboBoxItem Content="Pendente"/>
+                <ComboBoxItem Content="Pago"/>
+            </ComboBox>
+        </Grid>
+
+        <!-- Botões -->
+        <StackPanel Grid.Row="2" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right"
+                    Margin="0,24,0,0">
+            <Button Content="Cancelar" 
+                    Style="{StaticResource MaterialDesignFlatButton}"
+                    Click="Cancelar_Click"
+                    Margin="0,0,8,0"
+                    Width="100"/>
+            <Button Content="Salvar" 
+                    Style="{StaticResource MaterialDesignRaisedButton}"
+                    Click="Salvar_Click"
+                    Width="100"/>
+        </StackPanel>
+    </Grid>
+</Window>
