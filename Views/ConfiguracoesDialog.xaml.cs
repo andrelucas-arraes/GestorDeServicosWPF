@@ -157,7 +157,7 @@ namespace GestaoAulas.Views
                 {
                     Title = "Selecionar Backup para Restaurar",
                     Filter = "Arquivos de Banco de Dados (*.db)|*.db",
-                    InitialDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "backups")
+                    InitialDirectory = BackupManager.Instance.PastaBackup
                 };
 
                 if (dialog.ShowDialog() == true)
@@ -245,11 +245,8 @@ namespace GestaoAulas.Views
                 
                 Aula.ValorHoraAula = valor;
 
-                // Salva caminho de backup externo
-                if (!string.IsNullOrWhiteSpace(txtCaminhoExterno.Text))
-                {
-                    BackupManager.Instance.CaminhoBackupExterno = txtCaminhoExterno.Text;
-                }
+                // Salva caminho de backup externo (permite limpar se vazio)
+                BackupManager.Instance.CaminhoBackupExterno = txtCaminhoExterno.Text?.Trim() ?? "";
                 
                 // Salva todas as configurações (incluindo valor hora e caminho)
                 BackupManager.Instance.SalvarConfiguracoes();

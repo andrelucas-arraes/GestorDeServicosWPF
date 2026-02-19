@@ -125,9 +125,11 @@ namespace GestaoAulas
                 string dbDestino = Path.Combine(appDataFolder, dbNome);
 
                 // MIGRACAO 1: De "GestaoAulas" (antigo) para "GestorDeServicos" (novo)
+                // Nota: Em DEBUG, não tenta migrar do AppData de produção para evitar misturar dados.
                 if (!File.Exists(dbDestino))
                 {
-                    // Tenta pegar do AppData antigo primeiro
+#if !DEBUG
+                    // Tenta pegar do AppData antigo primeiro (somente em RELEASE)
                     string dbAntigo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GestaoAulas", dbNome);
                     if (File.Exists(dbAntigo))
                     {
@@ -143,6 +145,10 @@ namespace GestaoAulas
                     }
                     // Se não tiver no antigo, tenta pegar do diretório local (legado v1)
                     else if (File.Exists(dbOrigem))
+#else
+                    // Em DEBUG: apenas tenta copiar do diretório local (legado v1)
+                    if (File.Exists(dbOrigem))
+#endif
                     {
                         Log.Information("Detectado banco de dados local legado. Migrando para AppData: {Destino}", dbDestino);
                         try 
@@ -163,13 +169,17 @@ namespace GestaoAulas
                 
                 if (!File.Exists(cfgDestino))
                 {
-                    // Tenta do antigo
+#if !DEBUG
+                    // Tenta do antigo (somente em RELEASE)
                     string cfgAntigo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GestaoAulas", cfgNome);
                     if (File.Exists(cfgAntigo))
                     {
                         try { File.Copy(cfgAntigo, cfgDestino); } catch { }
                     }
                     else if (File.Exists(cfgOrigem))
+#else
+                    if (File.Exists(cfgOrigem))
+#endif
                     {
                         try { File.Copy(cfgOrigem, cfgDestino); } catch { }
                     }

@@ -111,9 +111,9 @@ namespace GestaoAulas.Repositories
                     DiaSemana = aula.DiaSemana,
                     NomeAula = aula.NomeAula,
                     Duracao = aula.Duracao,
-                    // Removido cast para double para manter precisão (Dapper decide o melhor tipo, geralmente REAL ou NUMERIC no SQLite)
-                    Valor = aula.Valor,
-                    ValorHora = aula.ValorHora,
+                    // Armazena como texto para preservar precisão financeira decimal (Fix #17)
+                    Valor = aula.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ValorHora = aula.ValorHora.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     Categoria = aula.Categoria,
                     Status = aula.Status,
                     DataCriacao = aula.DataCriacao.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -163,9 +163,9 @@ namespace GestaoAulas.Repositories
                     DiaSemana = aula.DiaSemana,
                     NomeAula = aula.NomeAula,
                     Duracao = aula.Duracao,
-                    // Removido cast para double
-                    Valor = aula.Valor,
-                    ValorHora = aula.ValorHora,
+                    // Armazena como texto para preservar precisão financeira decimal (Fix #17)
+                    Valor = aula.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ValorHora = aula.ValorHora.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     Categoria = aula.Categoria,
                     Status = aula.Status,
                     DataAtualizacao = aula.DataAtualizacao.ToString("yyyy-MM-dd HH:mm:ss")

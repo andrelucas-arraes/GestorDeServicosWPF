@@ -31,7 +31,7 @@ namespace GestaoAulas.Utils
                     int.TryParse(partes[1], out int minutos))
                 {
                     duracao = horas + (minutos / 60.0);
-                    return duracao > 0;
+                    return duracao >= 0; // Formato válido; 0 aceito (validar mínimo no chamador)
                 }
             }
 
@@ -39,7 +39,7 @@ namespace GestaoAulas.Utils
             if (double.TryParse(texto.Replace(",", "."), 
                 NumberStyles.Any, CultureInfo.InvariantCulture, out duracao))
             {
-                return duracao > 0;
+                return duracao >= 0;
             }
 
             return false;
@@ -73,7 +73,8 @@ namespace GestaoAulas.Utils
             return false;
         }
 
-        private static bool _isFormattingData = false;
+        [ThreadStatic]
+        private static bool _isFormattingData;
         
         public static void MascaraData(TextBox textBox, bool isBackspace = false)
         {
@@ -138,7 +139,8 @@ namespace GestaoAulas.Utils
             }
         }
         
-        private static bool _isFormattingDuracao = false;
+        [ThreadStatic]
+        private static bool _isFormattingDuracao;
         
         public static void MascaraDuracao(TextBox textBox)
         {

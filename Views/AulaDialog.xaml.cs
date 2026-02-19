@@ -33,12 +33,19 @@ namespace GestaoAulas.Views
             // Inicialização dos campos
             Loaded += (s, e) =>
             {
-                // Configura eventos de teclado PRIMEIRO
-                txtData.PreviewTextInput += TxtData_PreviewTextInput;
-                // txtData.PreviewKeyDown += TxtData_PreviewKeyDown; // Removido para evitar bug de backspace
-                
                 // Inicializa o campo de data
-                txtData.Text = _aulaEdicao.Data.ToString("dd/MM/yyyy");
+                dtData.SelectedDate = _aulaEdicao.Data;
+
+                // Atualiza o dia da semana ao mudar a data
+                dtData.SelectedDateChanged += (sender, args) =>
+                {
+                    if (dtData.SelectedDate.HasValue)
+                    {
+                        txtDiaSemana.Text = ObterDiaSemanaBreve(dtData.SelectedDate.Value);
+                        // Atualiza o model imediatamente (Fix #18)
+                        _aulaEdicao.Data = dtData.SelectedDate.Value;
+                    }
+                };
 
                 txtDuracao.Text = _aulaEdicao.DuracaoFormatada;
                 txtDiaSemana.Text = _aulaEdicao.DiaSemana;
@@ -69,38 +76,7 @@ namespace GestaoAulas.Views
             }
         }
 
-        /// <summary>
-        /// Processa entrada de texto no campo de data com máscara automática.
-        /// </summary>
-        private void TxtData_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                if (!char.IsDigit(e.Text, 0)) { e.Handled = true; return; }
-                
-                string digits = new string(textBox.Text.Where(char.IsDigit).ToArray());
-                if (digits.Length >= 8) { e.Handled = true; return; }
 
-                FormatUtils.MascaraData(textBox);
-                
-                // Tenta atualizar o dia da semana em tempo real se a data estiver completa
-                if (FormatUtils.TryParseData(textBox.Text, out DateTime data))
-                {
-                    txtDiaSemana.Text = ObterDiaSemanaBreve(data);
-                }
-            }
-        }
-
-        // Removido TxtData_PreviewKeyDown para corrigir bug de dupla exclusão no Backspace
-        /*
-        private void TxtData_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (sender is TextBox textBox && e.Key == Key.Back)
-            {
-                FormatUtils.MascaraData(textBox, true);
-            }
-        }
-        */
 
         private string ObterDiaSemanaBreve(DateTime data)
         {
@@ -118,89 +94,7 @@ namespace GestaoAulas.Views
         }
 
 
-        /// <summary>
-        /// Intercepta entrada de texto no campo de duração.
-        /// </summary>
-        private void Duracao_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                if (!char.IsDigit(e.Text, 0))
-                {
-                    e.Handled = true;
-                    return;
-                }
 
-                // Calcula como o texto ficará após a inserção (respeitando seleção)
-                string fullText = textBox.Text;
-                string newPart = e.Text;
-                
-                // Remove o trecho selecionado
-                if (textBox.SelectionLength > 0)
-                {
-                    fullText = fullText.Remove(textBox.SelectionStart, textBox.SelectionLength);
-                }
-                
-                // Insere o novo texto na posição correta
-                string finalPredicted = fullText.Insert(textBox.CaretIndex, newPart);
-                
-                // Extrai apenas os dígitos para formatar
-                string digits = new string(finalPredicted.Where(char.IsDigit).ToArray());
-                
-                if (digits.Length >= 5) // Limite H:MM (ex: 99:59)
-                {
-                    e.Handled = true;
-                    return;
-                }
-                
-                textBox.Text = FormatarDuracao(digits);
-                textBox.CaretIndex = textBox.Text.Length;
-                
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Trata backspace no campo de duração.
-        /// </summary>
-        private void Duracao_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (sender is TextBox textBox && e.Key == Key.Back)
-            {
-                string text = textBox.Text;
-                if (string.IsNullOrEmpty(text)) return;
-
-                if (textBox.SelectionLength > 0)
-                {
-                    // Remove a seleção
-                    text = text.Remove(textBox.SelectionStart, textBox.SelectionLength);
-                }
-                else if (textBox.CaretIndex > 0)
-                {
-                    // Remove o caractere anterior
-                    text = text.Remove(textBox.CaretIndex - 1, 1);
-                }
-
-                string digits = new string(text.Where(char.IsDigit).ToArray());
-                textBox.Text = FormatarDuracao(digits);
-                textBox.CaretIndex = textBox.Text.Length;
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Formata dígitos como duração H:MM.
-        /// </summary>
-        private string FormatarDuracao(string digits)
-        {
-            if (string.IsNullOrEmpty(digits)) return "";
-            
-            if (digits.Length >= 3)
-            {
-                return digits.Substring(0, digits.Length - 2) + ":" + digits.Substring(digits.Length - 2);
-            }
-            return digits;
-        }
 
         /// <summary>
         /// Salva a aula.
@@ -219,13 +113,14 @@ namespace GestaoAulas.Views
                 }
 
                 // Valida data
-                if (!FormatUtils.TryParseData(txtData.Text, out DateTime data))
+                if (!dtData.SelectedDate.HasValue)
                 {
-                    CustomMessageBox.Show("Por favor, informe uma data válida no formato DD/MM/AAAA.",
+                    CustomMessageBox.Show("Por favor, selecione uma data válida.",
                         "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    txtData.Focus();
+                    dtData.Focus();
                     return;
                 }
+                DateTime data = dtData.SelectedDate.Value;
 
 
                 // Valida data futura
@@ -236,7 +131,7 @@ namespace GestaoAulas.Views
                      
                     if (result == MessageBoxResult.No)
                     {
-                        txtData.Focus();
+                        dtData.Focus();
                         return;
                     }
                 }
@@ -296,8 +191,20 @@ namespace GestaoAulas.Views
                      }
                 }
 
-                // Sempre recalcula o valor baseado na nova duração e valor hora (se for Aula)
-                _aulaEdicao.RecalcularValor();
+                // Se for Aula, recalcula valor com base em duração e valor/hora
+                // MAS preserva valor manual se o usuário digitou um diferente (Fix #9)
+                if (_aulaEdicao.Categoria == "Aula")
+                {
+                    decimal valorAntes = _aulaEdicao.Valor;
+                    _aulaEdicao.RecalcularValor();
+                    
+                    // Se o campo txtValor tiver valor diferente do recalculado, o usuário editou manualmente
+                    if (FormatUtils.TryParseDecimal(txtValor.Text, out decimal valDigitado) && valDigitado != _aulaEdicao.Valor && valDigitado != valorAntes)
+                    {
+                        // O usuário alterou o valor manualmente — mantém o digitado
+                        _aulaEdicao.Valor = valDigitado;
+                    }
+                }
 
                 // Copia valores de volta para o objeto original se for edição
                 if (!_isNova)

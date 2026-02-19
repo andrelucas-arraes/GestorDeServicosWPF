@@ -46,13 +46,13 @@
 
             <!-- Data e Dia -->
 
-             <TextBox x:Name="txtData"
+             <!-- Data e Dia -->
+
+             <DatePicker x:Name="dtData"
                      Grid.Row="0" Grid.Column="0"
                      Margin="0,0,8,20"
-                     Style="{StaticResource MaterialDesignFloatingHintTextBox}"
-                     materialDesign:HintAssist.Hint="Data (DD/MM/AAAA)"
-                     materialDesign:TextFieldAssist.CharacterCounterVisibility="Collapsed"
-                     MaxLength="10"/>
+                     Style="{StaticResource MaterialDesignFloatingHintDatePicker}"
+                     materialDesign:HintAssist.Hint="Data"/>
 
              <ComboBox x:Name="cmbCategoria"
                        Grid.Row="0" Grid.Column="1"
@@ -89,11 +89,9 @@
              <TextBox x:Name="txtDuracao"
                       Grid.Row="2" Grid.Column="0"
                       Margin="0,0,4,20"
-                      materialDesign:HintAssist.Hint="Duração (H:MM)"
+                      materialDesign:HintAssist.Hint="Duração (H ou H:MM)"
                       materialDesign:TextFieldAssist.CharacterCounterVisibility="Collapsed"
-                      MaxLength="5"
-                      PreviewTextInput="Duracao_PreviewTextInput"
-                      PreviewKeyDown="Duracao_PreviewKeyDown">
+                      MaxLength="10">
                  <TextBox.Style>
                      <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
                          <Setter Property="Visibility" Value="Collapsed"/>

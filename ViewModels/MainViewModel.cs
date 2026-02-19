@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -107,26 +108,40 @@ namespace GestaoAulas.ViewModels
         public ObservableCollection<int> Anos { get; } = new();
 
         // --- Hooks de Propriedades ---
-        // private volatile bool _isDataLoading = false; // Removido para evitar bloqueio indevido
         private Guid _currentLoadId;
+        private bool _suppressAutoLoad; // Evita recargas em cascata ao mudar filtros programaticamente
+        private CancellationTokenSource? _debounceCts; // Debounce com cancelamento
 
         async partial void OnMesSelecionadoChanged(int? value) 
         {
-            await CarregarDadosAsync();
+            if (_suppressAutoLoad) return;
+            try { await CarregarDadosAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnMesSelecionadoChanged"); }
         }
 
         async partial void OnAnoSelecionadoChanged(int? value)
         {
-            await CarregarDadosAsync();
+            if (_suppressAutoLoad) return;
+            try { await CarregarDadosAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnAnoSelecionadoChanged"); }
         }
 
         async partial void OnTermoBuscaChanged(string value) 
         {
-            // Debounce para evitar queries excessivas no banco enquanto digita
-            await Task.Delay(300);
-            if (value != TermoBusca) return; // Se o valor mudou durante o delay, ignora
-            
-            await CarregarDadosAsync();
+            try
+            {
+                // Cancela o debounce anterior
+                _debounceCts?.Cancel();
+                var cts = new CancellationTokenSource();
+                _debounceCts = cts;
+                
+                await Task.Delay(300, cts.Token);
+                if (cts.Token.IsCancellationRequested || value != TermoBusca) return;
+                
+                await CarregarDadosAsync();
+            }
+            catch (OperationCanceledException) { /* esperado: debounce cancelado */ }
+            catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnTermoBuscaChanged"); }
         }
 
         // --- Comandos ---
@@ -136,9 +151,18 @@ namespace GestaoAulas.ViewModels
         {
             _logger.LogInformation("Iniciando carregamento de dados iniciais...");
             
-            // Primeiro carrega os anos (isso popula a lista do ComboBox)
-            await CarregarAnosAsync();
+            _suppressAutoLoad = true;
+            try
+            {
+                // Primeiro carrega os anos (isso popula a lista do ComboBox)
+                await CarregarAnosAsync();
+            }
+            finally
+            {
+                _suppressAutoLoad = false;
+            }
             
+            // Agora faz um único carregamento com os filtros já definidos
             await CarregarDadosAsync();
             
             _logger.LogInformation("Inicialização de dados concluída.");
@@ -228,10 +252,19 @@ namespace GestaoAulas.ViewModels
                 _dialogService.ShowMessage(msgSucesso, "Sucesso");
 
                 // Atualiza filtros para o período da aula adicionada (para que o usuário veja que salvou)
-                await CarregarAnosAsync(); 
-                AnoSelecionado = anoAula;
-                MesSelecionado = mesAula;
+                _suppressAutoLoad = true;
+                try
+                {
+                    await CarregarAnosAsync(); 
+                    AnoSelecionado = anoAula;
+                    MesSelecionado = mesAula;
+                }
+                finally
+                {
+                    _suppressAutoLoad = false;
+                }
                 
+                // Um único carregamento final com filtros já definidos
                 await CarregarDadosAsync();
                 
                 sw.Stop();
@@ -337,7 +370,13 @@ namespace GestaoAulas.ViewModels
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao alterar status da aula ID={Id} para {Status}", aulaId, status);
+                // Rollback do status em caso de falha no banco
+                if (AulaSelecionada != null && AulaSelecionada.Id == aulaId)
+                {
+                    AulaSelecionada.Status = statusAnterior;
+                }
+                
+                _logger.LogError(ex, "Erro ao alterar status da aula ID={Id} para {Status}. Rollback para {StatusAnterior}", aulaId, status, statusAnterior);
                 _dialogService.ShowMessage($"Erro ao alterar status:\n\n{ex.Message}", "Erro");
             }
         }

@@ -16,6 +16,11 @@ namespace GestaoAulas.Services
 
         public int MaxBackups { get; set; } = 50; // Aumentado para 50 para maior segurança
         public string? CaminhoBackupExterno { get; set; }
+        
+        /// <summary>
+        /// Caminho público da pasta de backups, para uso nos diálogos.
+        /// </summary>
+        public string PastaBackup => _backupsPath;
 
         private readonly string _databasePath;
         private readonly string _backupsPath;

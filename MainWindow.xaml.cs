@@ -86,7 +86,18 @@ namespace GestaoAulas
                 }
                 else if (e.Key == Key.Enter)
                 {
-                    // Adiciona aula ao pressionar Enter
+                    // Valida a data antes de adicionar (Fix #11)
+                    if (!FormatUtils.TryParseData(txtNovaData.Text, out _))
+                    {
+                        GestaoAulas.Views.CustomMessageBox.Show(
+                            "Data inválida ou incompleta. Corrija antes de adicionar.",
+                            "Validação",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        txtNovaData.Focus();
+                        e.Handled = true;
+                        return;
+                    }
                     Adicionar_Click(null!, null!);
                     e.Handled = true;
                 }

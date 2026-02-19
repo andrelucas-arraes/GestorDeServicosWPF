@@ -12,6 +12,8 @@ namespace GestaoAulas.Views
         public CustomMessageBox()
         {
             InitializeComponent();
+            // Permite arrastar a janela WindowStyle=None (Fix #13)
+            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
         }
 
         public static MessageBoxResult Show(Window owner, string message, string caption, MessageBoxButton button, MessageBoxImage icon)
@@ -63,14 +65,30 @@ namespace GestaoAulas.Views
                 return Show(owner, message, caption, button, icon);
                 
             var msgBox = new CustomMessageBox();
+            msgBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             msgBox.txtMessage.Text = message;
             msgBox.txtTitle.Text = caption;
             
-            // (repetição de lógica removida no refactor ideal, mas aqui vamos manter o básico)
             msgBox.txtIcon.Text = icon switch { MessageBoxImage.Error => "[X]", MessageBoxImage.Warning => "[!]", MessageBoxImage.Question => "[?]", _ => "[i]" };
+            
+            // Configura TODOS os tipos de botão (Fix #14)
             switch (button) {
-                case MessageBoxButton.OK: msgBox.AddButton("OK", MessageBoxResult.OK, true); break;
-                case MessageBoxButton.YesNo: msgBox.AddButton("Sim", MessageBoxResult.Yes, true); msgBox.AddButton("Não", MessageBoxResult.No, false, true); break;
+                case MessageBoxButton.OK: 
+                    msgBox.AddButton("OK", MessageBoxResult.OK, true); 
+                    break;
+                case MessageBoxButton.OKCancel:
+                    msgBox.AddButton("OK", MessageBoxResult.OK, true);
+                    msgBox.AddButton("Cancelar", MessageBoxResult.Cancel, false, true);
+                    break;
+                case MessageBoxButton.YesNo: 
+                    msgBox.AddButton("Sim", MessageBoxResult.Yes, true); 
+                    msgBox.AddButton("Não", MessageBoxResult.No, false, true); 
+                    break;
+                case MessageBoxButton.YesNoCancel:
+                    msgBox.AddButton("Sim", MessageBoxResult.Yes, true);
+                    msgBox.AddButton("Não", MessageBoxResult.No);
+                    msgBox.AddButton("Cancelar", MessageBoxResult.Cancel, false, true);
+                    break;
             }
 
             msgBox.ShowDialog();

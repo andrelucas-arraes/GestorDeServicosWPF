@@ -160,15 +160,34 @@ namespace GestaoAulas.Models
                 DataAtualizacao = DateTime.Now
             };
             
+            // Garante que DiaSemana seja preenchido (Fix #2)
+            aula.DiaSemana = ObterDiaSemana(aula.Data);
+            
             // Calcula valor inicial
             aula.RecalcularValor();
             
             return aula;
         }
 
+        /// <summary>
+        /// Cria uma cópia profunda da aula, sem compartilhar estado do ObservableObject.
+        /// </summary>
         public Aula Clone()
         {
-            return (Aula)this.MemberwiseClone();
+            return new Aula
+            {
+                Id = this.Id,
+                Data = this.Data,
+                DiaSemana = this.DiaSemana,
+                NomeAula = this.NomeAula,
+                Duracao = this.Duracao,
+                Valor = this.Valor,
+                ValorHora = this.ValorHora,
+                Status = this.Status,
+                Categoria = this.Categoria,
+                DataCriacao = this.DataCriacao,
+                DataAtualizacao = this.DataAtualizacao
+            };
         }
     }
 }
