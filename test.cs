@@ -1,0 +1,1 @@
+using LiveChartsCore; using LiveChartsCore.SkiaSharpView; class Program { static void Main() { var p = new PieSeries<double>(); p.ToolTipLabelFormatter = x=>null; var c = new ColumnSeries<double>(); c.YToolTipLabelFormatter = x=>null; } }

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using GestaoAulas.Models;
+using GestaoAulas.Repositories;
 using GestaoAulas.Utils;
 using System.Linq;
 
@@ -14,90 +15,69 @@ namespace GestaoAulas.Views
     /// </summary>
     public partial class AulaDialog : Window
     {
-        private readonly Aula _aulaOriginal;
-        private readonly Aula _aulaEdicao;
+        private readonly Aula _aula;
         private readonly bool _isNova;
-
 
         public AulaDialog(Aula? aula = null)
         {
             InitializeComponent();
 
             _isNova = aula == null;
-            _aulaOriginal = aula ?? Aula.CriarNova();
-            _aulaEdicao = _isNova ? _aulaOriginal : _aulaOriginal.Clone();
+            _aula = aula ?? Aula.CriarNova();
 
-            DataContext = _aulaEdicao;
-            Title = _isNova ? "Nova Aula" : "Editar Aula";
+            DataContext = _aula;
+            Title = _isNova ? "Novo Registro" : "Editar Registro";
 
-            // Inicialização dos campos
-            Loaded += (s, e) =>
+            Loaded += async (s, e) =>
             {
-                // Inicializa o campo de data
-                dtData.SelectedDate = _aulaEdicao.Data;
+                // Carrega categorias do banco
+                try
+                {
+                    var repository = (IAulaRepository)App.AppHost!.Services.GetService(typeof(IAulaRepository))!;
+                    var categorias = await repository.ObterCategoriasAsync();
+                    
+                    cmbCategoria.Items.Clear();
+                    foreach (var cat in categorias)
+                    {
+                        cmbCategoria.Items.Add(new ComboBoxItem { Content = cat });
+                    }
 
-                // Atualiza o dia da semana ao mudar a data
+                    // Seleciona a categoria atual
+                    cmbCategoria.SelectedValue = _aula.Categoria;
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error(ex, "Erro ao carregar categorias no diálogo de aula");
+                    // Fallback
+                    var categoriasPadrao = new[] { "Aula", "Serviço", "Freelance", "Manutenção", "Outro" };
+                    cmbCategoria.Items.Clear();
+                    foreach (var cat in categoriasPadrao)
+                    {
+                        cmbCategoria.Items.Add(new ComboBoxItem { Content = cat });
+                    }
+                    cmbCategoria.SelectedValue = _aula.Categoria;
+                }
+
+                // Inicializa campo de data
+                dtData.SelectedDate = _aula.Data;
+
+                // Atualiza dia da semana ao mudar data
                 dtData.SelectedDateChanged += (sender, args) =>
                 {
                     if (dtData.SelectedDate.HasValue)
                     {
-                        txtDiaSemana.Text = ObterDiaSemanaBreve(dtData.SelectedDate.Value);
-                        // Atualiza o model imediatamente (Fix #18)
-                        _aulaEdicao.Data = dtData.SelectedDate.Value;
+                        txtDiaSemana.Text = Aula.ObterDiaSemana(dtData.SelectedDate.Value);
+                        _aula.Data = dtData.SelectedDate.Value;
                     }
                 };
 
-                txtDuracao.Text = _aulaEdicao.DuracaoFormatada;
-                txtDiaSemana.Text = _aulaEdicao.DiaSemana;
-                
+                txtDiaSemana.Text = _aula.DiaSemana;
                 txtNomeAula.Focus();
-
-                // Recalcula valor apenas ao sair do campo para evitar pulos de cursor e loops de formatação
-                txtDuracao.LostFocus += (s, ev) => ReatualizarValorRealTime();
-                txtValorHora.LostFocus += (s, ev) => ReatualizarValorRealTime();
             };
         }
-
-        private void ReatualizarValorRealTime()
-        {
-            // Tenta obter os valores atuais sem disparar novos ciclos de atualização desnecessários
-            bool duraOk = FormatUtils.TryParseDuracao(txtDuracao.Text, out double duracao);
-            bool valorOk = FormatUtils.TryParseDecimal(txtValorHora.Text, out decimal vh);
-
-            if (duraOk) _aulaEdicao.Duracao = duracao;
-            if (valorOk) _aulaEdicao.ValorHora = vh;
-
-            if (duraOk || valorOk)
-            {
-                _aulaEdicao.RecalcularValor();
-                
-                // Atualiza a visualização formatada se necessário (pois o binding pode não atualizar se não for TwoWay/PropertyChanged)
-                if (duraOk) txtDuracao.Text = _aulaEdicao.DuracaoFormatada;
-            }
-        }
-
-
-
-        private string ObterDiaSemanaBreve(DateTime data)
-        {
-            return data.DayOfWeek switch
-            {
-                DayOfWeek.Sunday => "Dom",
-                DayOfWeek.Monday => "Seg",
-                DayOfWeek.Tuesday => "Ter",
-                DayOfWeek.Wednesday => "Qua",
-                DayOfWeek.Thursday => "Qui",
-                DayOfWeek.Friday => "Sex",
-                DayOfWeek.Saturday => "Sáb",
-                _ => ""
-            };
-        }
-
-
-
 
         /// <summary>
-        /// Salva a aula.
+        /// Salva o registro.
         /// </summary>
         private void Salvar_Click(object sender, RoutedEventArgs e)
         {
@@ -106,7 +86,7 @@ namespace GestaoAulas.Views
                 // Valida nome
                 if (string.IsNullOrWhiteSpace(txtNomeAula.Text))
                 {
-                    CustomMessageBox.Show("Por favor, informe o nome do aluno ou descrição da aula.",
+                    CustomMessageBox.Show("Por favor, informe o nome/descrição.",
                         "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
                     txtNomeAula.Focus();
                     return;
@@ -122,7 +102,6 @@ namespace GestaoAulas.Views
                 }
                 DateTime data = dtData.SelectedDate.Value;
 
-
                 // Valida data futura
                 if (data.Date > DateTime.Now.Date)
                 {
@@ -136,89 +115,28 @@ namespace GestaoAulas.Views
                     }
                 }
 
-                // Valida duração apenas se for Aula
-                double duracao = 0;
-                if (_aulaEdicao.Categoria == "Aula")
+                // Valida valor
+                if (!FormatUtils.TryParseDecimal(txtValor.Text, out decimal valorFinal))
                 {
-                    if (!FormatUtils.TryParseDuracao(txtDuracao.Text, out duracao))
-                    {
-                        CustomMessageBox.Show("Por favor, informe uma duração válida (ex: 1:30 ou 1.5).",
-                            "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        txtDuracao.Focus();
-                        return;
-                    }
-
-                    if (duracao > 1000)
-                    {
-                        CustomMessageBox.Show("A duração informada parece excessiva. Por favor, verifique.",
-                            "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        txtDuracao.Focus();
-                        return;
-                    }
+                    CustomMessageBox.Show("Por favor, informe um valor válido (ex: 50,00).",
+                        "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    txtValor.Focus();
+                    return;
                 }
 
-                // Atualiza modelo de edição
-                _aulaEdicao.Data = data;
-                _aulaEdicao.NomeAula = txtNomeAula.Text.Trim();
-                
-                if (_aulaEdicao.Categoria == "Aula")
+                if (valorFinal < 0)
                 {
-                    _aulaEdicao.Duracao = duracao;
-
-                    // Pega valor hora do campo (Pode ter sido editado)
-                    if (FormatUtils.TryParseDecimal(txtValorHora.Text, out decimal vh))
-                    {
-                        _aulaEdicao.ValorHora = vh;
-                    }
-
-                    // Proteção contra valores irreais/erros de digitação
-                    if (_aulaEdicao.ValorHora > 1000000)
-                    {
-                        CustomMessageBox.Show("O valor da hora informado parece excessivo. Por favor, verifique.",
-                            "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        txtValorHora.Focus();
-                        return;
-                    }
+                    CustomMessageBox.Show("O valor não pode ser negativo.",
+                        "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    txtValor.Focus();
+                    return;
                 }
 
-                // Se NÃO for aula (Serviço, etc), lemos o valor manualmente do campo de texto
-                // Isso previne bugs onde o binding não atualizou o ViewModel (ex: LostFocus não disparou)
-                if (_aulaEdicao.Categoria != "Aula")
-                {
-                     if (FormatUtils.TryParseDecimal(txtValor.Text, out decimal valManual))
-                     {
-                         _aulaEdicao.Valor = valManual;
-                     }
-                }
-
-                // Se for Aula, recalcula valor com base em duração e valor/hora
-                // MAS preserva valor manual se o usuário digitou um diferente (Fix #9)
-                if (_aulaEdicao.Categoria == "Aula")
-                {
-                    decimal valorAntes = _aulaEdicao.Valor;
-                    _aulaEdicao.RecalcularValor();
-                    
-                    // Se o campo txtValor tiver valor diferente do recalculado, o usuário editou manualmente
-                    if (FormatUtils.TryParseDecimal(txtValor.Text, out decimal valDigitado) && valDigitado != _aulaEdicao.Valor && valDigitado != valorAntes)
-                    {
-                        // O usuário alterou o valor manualmente — mantém o digitado
-                        _aulaEdicao.Valor = valDigitado;
-                    }
-                }
-
-                // Copia valores de volta para o objeto original se for edição
-                if (!_isNova)
-                {
-                    _aulaOriginal.Data = _aulaEdicao.Data;
-                    _aulaOriginal.DiaSemana = _aulaEdicao.DiaSemana;
-                    _aulaOriginal.NomeAula = _aulaEdicao.NomeAula;
-                    _aulaOriginal.Duracao = _aulaEdicao.Duracao;
-                    _aulaOriginal.ValorHora = _aulaEdicao.ValorHora;
-                    _aulaOriginal.Valor = _aulaEdicao.Valor;
-                    _aulaOriginal.Status = _aulaEdicao.Status;
-                    _aulaOriginal.Categoria = _aulaEdicao.Categoria;
-                    _aulaOriginal.DataAtualizacao = DateTime.Now;
-                }
+                // Atualiza modelo
+                _aula.Data = data;
+                _aula.NomeAula = txtNomeAula.Text.Trim();
+                _aula.Valor = valorFinal;
+                _aula.DataAtualizacao = DateTime.Now;
 
                 DialogResult = true;
                 Close();

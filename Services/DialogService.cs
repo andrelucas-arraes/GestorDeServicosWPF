@@ -7,10 +7,10 @@ namespace GestaoAulas.Services
         void ShowMessage(string message, string title);
         bool Confirm(string message, string title);
         
-        // Métodos específicos para janelas da aplicação
         bool ShowAulaDialog(GestaoAulas.Models.Aula aula);
         void ShowExportDialog(System.Collections.Generic.List<GestaoAulas.Models.Aula> aulas, int? mes, int? ano);
         void ShowConfiguracoesDialog();
+        void ShowAnalisesDialog(System.Collections.Generic.List<GestaoAulas.Models.Aula> aulas);
     }
 
     public class DialogService : IDialogService
@@ -70,6 +70,16 @@ namespace GestaoAulas.Services
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
             {
                 var dialog = new GestaoAulas.Views.ConfiguracoesDialog();
+                dialog.Owner = GetMainWindow();
+                dialog.ShowDialog();
+            });
+        }
+
+        public void ShowAnalisesDialog(System.Collections.Generic.List<GestaoAulas.Models.Aula> aulas)
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                var dialog = new GestaoAulas.Views.AnalisesDialog(aulas);
                 dialog.Owner = GetMainWindow();
                 dialog.ShowDialog();
             });

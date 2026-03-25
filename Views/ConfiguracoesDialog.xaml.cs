@@ -1,5 +1,5 @@
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using GestaoAulas.Services;
 using GestaoAulas.Models;
+using GestaoAulas.Repositories;
 using GestaoAulas.Utils;
 using Microsoft.Win32;
 
@@ -17,75 +18,125 @@ namespace GestaoAulas.Views
     /// </summary>
     public partial class ConfiguracoesDialog : Window
     {
+        private readonly IAulaRepository _repository;
+
         public ConfiguracoesDialog()
         {
             InitializeComponent();
             
-            Serilog.Log.Debug("Abrindo diálogo de configurações. ValorHoraAtual={Valor}", 
-                GestaoAulas.Models.Aula.ValorHoraAula);
+            // Obtém o repository via DI
+            _repository = (IAulaRepository)App.AppHost!.Services.GetService(typeof(IAulaRepository))!;
+            
+            Serilog.Log.Debug("Abrindo diálogo de configurações.");
             
             CarregarConfiguracoes();
-
-            // Formatação automática ao sair do campo (mantém compatibilidade)
-            txtValorHora.LostFocus += (s, e) => 
-            {
-                FormatarCampoValor();
-            };
+            CarregarCategoriasAsync();
         }
 
-        /// <summary>
-        /// Formata o campo de valor monetário.
-        /// </summary>
-        private void FormatarCampoValor()
+        private async void CarregarCategoriasAsync()
         {
-            string texto = txtValorHora.Text.Replace("R$", "").Replace(".", ",").Trim();
-            if (decimal.TryParse(texto, NumberStyles.Currency, new CultureInfo("pt-BR"), out decimal valor))
+            try
             {
-                txtValorHora.Text = valor.ToString("N2", new CultureInfo("pt-BR"));
+                var categorias = await _repository.ObterCategoriasAsync();
+                lstCategorias.Items.Clear();
+                foreach (var cat in categorias)
+                {
+                    lstCategorias.Items.Add(cat);
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "Erro ao carregar categorias no diálogo de configurações");
             }
         }
 
-        /// <summary>
-        /// Formatação automática de valor ao digitar.
-        /// </summary>
-        private void ValorHora_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        private async void AdicionarCategoria_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is TextBox textBox)
+            try
             {
-                // Aceita apenas dígitos e vírgula
-                char c = e.Text[0];
-                if (!char.IsDigit(c) && c != ',')
+                var novaCategoria = txtNovaCategoria.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(novaCategoria))
                 {
-                    e.Handled = true;
+                    CustomMessageBox.Show("Digite o nome da nova categoria.", "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    txtNovaCategoria.Focus();
                     return;
                 }
+
+                if (novaCategoria.Length < 2)
+                {
+                    CustomMessageBox.Show("O nome da categoria deve ter pelo menos 2 caracteres.", "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    txtNovaCategoria.Focus();
+                    return;
+                }
+
+                // Verifica se já existe
+                foreach (var item in lstCategorias.Items)
+                {
+                    if (item.ToString()!.Equals(novaCategoria, StringComparison.OrdinalIgnoreCase))
+                    {
+                        CustomMessageBox.Show("Essa categoria já existe.", "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+
+                await _repository.AdicionarCategoriaAsync(novaCategoria);
+                lstCategorias.Items.Add(novaCategoria);
+                txtNovaCategoria.Text = "";
+
+                CustomMessageBox.Show($"Categoria '{novaCategoria}' adicionada com sucesso!", "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "Erro ao adicionar categoria");
+                CustomMessageBox.Show($"Erro ao adicionar categoria: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void RemoverCategoria_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (lstCategorias.SelectedItem == null)
+                {
+                    CustomMessageBox.Show("Selecione uma categoria para remover.", "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var categoriaSelecionada = lstCategorias.SelectedItem.ToString()!;
                 
-                // Só permite uma vírgula
-                if (c == ',' && textBox.Text.Contains(','))
+                // Categorias protegidas
+                var protegidas = new[] { "Aula", "Serviço" };
+                if (protegidas.Contains(categoriaSelecionada))
                 {
-                    e.Handled = true;
+                    CustomMessageBox.Show($"A categoria '{categoriaSelecionada}' é uma categoria padrão e não pode ser removida.", "Aviso", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
+
+                var resultado = CustomMessageBox.Show(
+                    $"Deseja remover a categoria '{categoriaSelecionada}'?\n\nRegistros existentes com esta categoria NÃO serão afetados.",
+                    "Confirmar Remoção",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (resultado == MessageBoxResult.Yes)
+                {
+                    await _repository.RemoverCategoriaAsync(categoriaSelecionada);
+                    lstCategorias.Items.Remove(categoriaSelecionada);
+                    
+                    CustomMessageBox.Show($"Categoria '{categoriaSelecionada}' removida.", "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "Erro ao remover categoria");
+                CustomMessageBox.Show($"Erro ao remover categoria: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        /// <summary>
-        /// Trata backspace no campo de valor.
-        /// </summary>
-        private void ValorHora_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            // Permite navegação normal, apenas formata ao sair do campo
-        }
-
-        /// <summary>
-        /// Carrega as configurações atuais.
-        /// </summary>
         private void CarregarConfiguracoes()
         {
-            // Valor da hora-aula
-            txtValorHora.Text = Aula.ValorHoraAula.ToString("N2", new CultureInfo("pt-BR"));
-
-            // Info do banco
+            if (!BackupManager.IsInitialized) return;
+            
             var infoBanco = BackupManager.Instance.ObterInfoBanco();
             if (infoBanco.TamanhoBytes > 0)
             {
@@ -94,16 +145,12 @@ namespace GestaoAulas.Views
                 txtUltimoBackup.Text = $"Última modificação: {infoBanco.UltimaModificacao:dd/MM/yyyy HH:mm}";
             }
 
-            // Backup externo
             if (!string.IsNullOrEmpty(BackupManager.Instance.CaminhoBackupExterno))
             {
                 txtCaminhoExterno.Text = BackupManager.Instance.CaminhoBackupExterno;
             }
         }
 
-        /// <summary>
-        /// Faz backup imediato.
-        /// </summary>
         private async void FazerBackup_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -121,7 +168,7 @@ namespace GestaoAulas.Views
                 }
                 else
                 {
-                    CustomMessageBox.Show("Não foi possível criar o backup. Verifique os logs para mais detalhes.", 
+                    CustomMessageBox.Show("Não foi possível criar o backup. Verifique os logs.", 
                         "Backup", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
@@ -137,9 +184,6 @@ namespace GestaoAulas.Views
             }
         }
 
-        /// <summary>
-        /// Restaura um backup selecionado.
-        /// </summary>
         private async void RestaurarBackup_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -171,28 +215,28 @@ namespace GestaoAulas.Views
                     if (resultado == MessageBoxResult.Yes)
                     {
                         Cursor = Cursors.Wait;
-                        Serilog.Log.Information("Iniciando restauração de backup via interface: {File}", dialog.FileName);
+                        Serilog.Log.Information("Restaurando backup: {File}", dialog.FileName);
                         
                         bool sucesso = await BackupManager.Instance.RestaurarBackupAsync(dialog.FileName);
                         
                         if (sucesso)
                         {
-                            CustomMessageBox.Show("Restauração concluída com sucesso!\n\nA aplicação deve ser reiniciada para carregar os novos dados.",
+                            CustomMessageBox.Show("Restauração concluída!\n\nA aplicação será reiniciada.",
                                 "Sucesso", MessageBoxButton.OK, MessageBoxImage.Information);
                         }
                         else
                         {
-                            CustomMessageBox.Show("Falha ao restaurar backup. O arquivo pode estar corrompido ou em uso.",
-                                "Erro na Restauração", MessageBoxButton.OK, MessageBoxImage.Error);
+                            CustomMessageBox.Show("Falha ao restaurar backup. O arquivo pode estar corrompido.",
+                                "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Serilog.Log.Error(ex, "Falha durante o processo de restauração");
+                Serilog.Log.Error(ex, "Falha durante restauração");
                 CustomMessageBox.Show($"Erro crítico na restauração: {ex.Message}",
-                    "Erro Fatal", MessageBoxButton.OK, MessageBoxImage.Error);
+                    "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -200,9 +244,6 @@ namespace GestaoAulas.Views
             }
         }
 
-        /// <summary>
-        /// Seleciona pasta para backup externo.
-        /// </summary>
         private void SelecionarPastaExterna_Click(object sender, RoutedEventArgs e)
         {
             using var dialog = new System.Windows.Forms.FolderBrowserDialog
@@ -214,68 +255,19 @@ namespace GestaoAulas.Views
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 txtCaminhoExterno.Text = dialog.SelectedPath;
-            }
-        }
-
-        /// <summary>
-        /// Salva as configurações.
-        /// </summary>
-        private void Salvar_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                // Valida e salva valor da hora-aula
-                string valorTexto = txtValorHora.Text.Replace("R$", "").Replace(".", ",").Trim();
-                if (!decimal.TryParse(valorTexto, NumberStyles.Currency, new CultureInfo("pt-BR"), out decimal valor))
-                {
-                    CustomMessageBox.Show("Valor da hora inválido! Por favor, informe um valor numérico válido.",
-                        "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    txtValorHora.Focus();
-                    return;
-                }
                 
-                // Validação adicional para valor razoável
-                if (valor <= 0 || valor > 10000)
-                {
-                    CustomMessageBox.Show("O valor da hora deve ser maior que zero e menor que R$ 10.000,00.",
-                        "Validação", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    txtValorHora.Focus();
-                    return;
-                }
-                
-                Aula.ValorHoraAula = valor;
-
-                // Salva caminho de backup externo (permite limpar se vazio)
-                BackupManager.Instance.CaminhoBackupExterno = txtCaminhoExterno.Text?.Trim() ?? "";
-                
-                // Salva todas as configurações (incluindo valor hora e caminho)
+                // Salva diretamente
+                BackupManager.Instance.CaminhoBackupExterno = dialog.SelectedPath;
                 BackupManager.Instance.SalvarConfiguracoes();
-
-                Serilog.Log.Information("Configurações salvas com sucesso. Novo ValorHora={Valor}", valor);
-
-                DialogResult = true;
-                Close();
-            }
-            catch (Exception ex)
-            {
-                Serilog.Log.Error(ex, "Erro ao salvar configurações");
-                CustomMessageBox.Show($"Erro ao salvar: {ex.Message}",
-                    "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        /// <summary>
-        /// Cancela e fecha.
-        /// </summary>
-        private void Cancelar_Click(object sender, RoutedEventArgs e)
+        private void Fechar_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
+            DialogResult = true;
             Close();
         }
 
-        /// <summary>
-        /// Formata tamanho em bytes para exibição.
-        /// </summary>
         private static string FormatarTamanho(long bytes)
         {
             string[] sufixos = { "B", "KB", "MB", "GB" };

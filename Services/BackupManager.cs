@@ -11,8 +11,22 @@ namespace GestaoAulas.Services
     /// </summary>
     public class BackupManager
     {
-        // instância estática para compatibilidade com ConfiguracoesDialog existente
-        public static BackupManager Instance { get; private set; } = null!;
+        // Fix 3.1: Instância estática com validação explícita
+        // Fix 5.2/5.3: Serilog.Log é usado diretamente neste serviço de infraestrutura por ser instanciado
+        // antes do container DI estar pronto. A propriedade Instance é mantida por compatibilidade
+        // com Views que não recebem dependências via DI.
+        private static BackupManager? _instance;
+        public static BackupManager Instance
+        {
+            get => _instance ?? throw new InvalidOperationException(
+                "BackupManager ainda não foi inicializado. Verifique a ordem de inicialização da aplicação.");
+            private set => _instance = value;
+        }
+        
+        /// <summary>
+        /// Indica se o BackupManager já foi inicializado.
+        /// </summary>
+        public static bool IsInitialized => _instance != null;
 
         public int MaxBackups { get; set; } = 50; // Aumentado para 50 para maior segurança
         public string? CaminhoBackupExterno { get; set; }
@@ -171,6 +185,13 @@ namespace GestaoAulas.Services
                     System.Diagnostics.Process.Start(appPath);
                     System.Windows.Application.Current.Shutdown();
                 }
+                else
+                {
+                    // Fix 3.4: Se ProcessPath é null, não podemos reiniciar.
+                    // Retorna false para indicar que a restauração precisa de reinicio manual.
+                    Serilog.Log.Warning("ProcessPath é null — não foi possível reiniciar automaticamente após restauração.");
+                    return false;
+                }
                 
                 return true;
             }
@@ -195,11 +216,10 @@ namespace GestaoAulas.Services
             try
             {
                 string caminho = CaminhoBackupExterno ?? "";
-                string valor = GestaoAulas.Models.Aula.ValorHoraAula.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 
                 Serilog.Log.Debug("Salvando configurações. Arquivo={Config}", _configFile);
                 
-                File.WriteAllLines(_configFile, new[] { caminho, valor });
+                File.WriteAllLines(_configFile, new[] { caminho });
                 
                 Serilog.Log.Information("Configurações salvas.");
             }
@@ -220,12 +240,8 @@ namespace GestaoAulas.Services
                     string[] linhas = File.ReadAllLines(_configFile);
                     if (linhas.Length > 0 && !string.IsNullOrWhiteSpace(linhas[0]))
                         CaminhoBackupExterno = linhas[0];
-                        
-                    if (linhas.Length > 1 && decimal.TryParse(linhas[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal valor))
-                        GestaoAulas.Models.Aula.ValorHoraAula = valor;
                     
-                    Serilog.Log.Information("Configurações carregadas. ValorHora={Valor}, CaminhoExterno={Caminho}", 
-                        GestaoAulas.Models.Aula.ValorHoraAula, CaminhoBackupExterno);
+                    Serilog.Log.Information("Configurações carregadas. CaminhoExterno={Caminho}", CaminhoBackupExterno);
                 }
                 else
                 {

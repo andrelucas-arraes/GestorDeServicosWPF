@@ -19,7 +19,6 @@
 
     <Window.Resources>
         <utils:StatusToBrushConverter x:Key="StatusToBrush"/>
-        <!-- Converters -->
     </Window.Resources>
 
     <Grid Background="#0a0b10">
@@ -38,7 +37,6 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
-
             <TextBlock Text="Gestão de Serviços &amp; Aulas" 
                        FontSize="22" 
                        FontWeight="Bold" 
@@ -46,7 +44,7 @@
                        VerticalAlignment="Center"/>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Content="Configuracoes" 
+                <Button Content="⚙ Configurações" 
                         Command="{Binding AbrirConfiguracoesCommand}"
                         Style="{StaticResource MaterialDesignOutlinedButton}" 
                         Foreground="White"
@@ -55,11 +53,20 @@
                         Height="40"
                         Padding="16,0"
                         Margin="0,0,12,0"/>
-                <Button Content="Exportar Dados" 
+                <Button Content="📥 Exportar Dados" 
                         Command="{Binding ExportarDadosCommand}"
                         Style="{StaticResource MaterialDesignOutlinedButton}"
                         Foreground="White"
                         BorderBrush="#cccccc"
+                        BorderThickness="1"
+                        Height="40"
+                        Padding="16,0"
+                        Margin="0,0,12,0"/>
+                <Button Content="📊 Ver Análises" 
+                        Command="{Binding AbrirAnalisesCommand}"
+                        Style="{StaticResource MaterialDesignOutlinedButton}"
+                        Foreground="#a78bfa"
+                        BorderBrush="#a78bfa"
                         BorderThickness="1"
                         Height="40"
                         Padding="16,0"/>
@@ -73,10 +80,11 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <!-- Card 1: Horas Totais -->
-            <Border Grid.Column="0" Margin="0,0,12,0" Padding="16,16,16,20" Background="#162c46">
+            <Border Grid.Column="0" Margin="0,0,8,0" Padding="16,16,16,20" Background="#162c46">
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="Total de Horas (Mês)" Foreground="#94a3b8" FontSize="13"/>
@@ -86,19 +94,30 @@
                 </Grid>
             </Border>
 
-            <!-- Card 2: Valor Pendente -->
-            <Border Grid.Column="1" Margin="12,0,12,0" Padding="16,16,16,20" Background="#431407">
+            <!-- Card 2: Valor Pendente (Mês Atual) -->
+            <Border Grid.Column="1" Margin="8,0,8,0" Padding="16,16,16,20" Background="#431407">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="Valor Pendente" Foreground="#94a3b8" FontSize="13"/>
+                        <TextBlock Text="Valor Pendente (Mês Atual)" Foreground="#94a3b8" FontSize="13"/>
                         <TextBlock Text="{Binding TotalPendenteFormatado}" FontWeight="Bold" FontSize="26" Margin="0,8,0,0" Foreground="#f97316"/>
                     </StackPanel>
                     <Border VerticalAlignment="Bottom" Height="2" Background="#f97316" Margin="-16,0,-16,-20"/>
                 </Grid>
             </Border>
 
-            <!-- Card 3: Total Recebido -->
-            <Border Grid.Column="2" Margin="12,0,12,0" Padding="16,16,16,20" Background="#064e3b">
+            <!-- Card 3: Valor Pendente (Ano) -->
+            <Border Grid.Column="2" Margin="8,0,8,0" Padding="16,16,16,20" Background="#3b0a0a">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="Valor Pendente (Ano)" Foreground="#94a3b8" FontSize="13"/>
+                        <TextBlock Text="{Binding TotalPendenteAnoFormatado}" FontWeight="Bold" FontSize="26" Margin="0,8,0,0" Foreground="#ef4444"/>
+                    </StackPanel>
+                    <Border VerticalAlignment="Bottom" Height="2" Background="#ef4444" Margin="-16,0,-16,-20"/>
+                </Grid>
+            </Border>
+
+            <!-- Card 4: Total Recebido -->
+            <Border Grid.Column="3" Margin="8,0,8,0" Padding="16,16,16,20" Background="#064e3b">
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="Total Recebido" Foreground="#94a3b8" FontSize="13"/>
@@ -108,8 +127,8 @@
                 </Grid>
             </Border>
 
-            <!-- Card 4: Qtd Aulas -->
-            <Border Grid.Column="3" Margin="12,0,0,0" Padding="16,16,16,20" Background="#162c46">
+            <!-- Card 5: Qtd Serviços -->
+            <Border Grid.Column="4" Margin="8,0,0,0" Padding="16,16,16,20" Background="#162c46">
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="Qtd. Serviços" Foreground="#94a3b8" FontSize="13"/>
@@ -120,7 +139,7 @@
             </Border>
         </Grid>
 
-        <!-- FILTROS (Período) -->
+        <!-- FILTROS (Período + Status) -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="24,16,24,16">
             <TextBlock Text="Período:" Foreground="#94a3b8" VerticalAlignment="Center" Margin="0,0,16,0" FontSize="14"/>
             <ComboBox ItemsSource="{Binding Meses}"
@@ -145,6 +164,22 @@
                       Foreground="White"
                       Width="110"
                       Height="45"
+                      VerticalContentAlignment="Center"
+                      Margin="0,0,24,0">
+                <ComboBox.Resources>
+                    <SolidColorBrush x:Key="MaterialDesignPaper" Color="#16213e"/>
+                </ComboBox.Resources>
+            </ComboBox>
+
+            <!-- Filtro de Status -->
+            <TextBlock Text="Status:" Foreground="#94a3b8" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="14"/>
+            <ComboBox ItemsSource="{Binding FiltroStatusOptions}"
+                      SelectedValue="{Binding FiltroStatusSelecionado, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                      Style="{StaticResource MaterialDesignFloatingHintComboBox}"
+                      materialDesign:HintAssist.Hint="Filtrar Status"
+                      Foreground="White"
+                      Width="140"
+                      Height="45"
                       VerticalContentAlignment="Center">
                 <ComboBox.Resources>
                     <SolidColorBrush x:Key="MaterialDesignPaper" Color="#16213e"/>
@@ -158,114 +193,59 @@
                 <TextBlock Text="ADICIONAR NOVO SERVIÇO/AULA" FontWeight="Bold" Foreground="White" Opacity="0.9" Margin="0,0,0,12" FontSize="14"/>
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="145"/>    <!-- Data -->
+                        <ColumnDefinition Width="135"/>    <!-- Categoria -->
+                        <ColumnDefinition Width="*"/>      <!-- Descr -->
+                        <ColumnDefinition Width="130"/>    <!-- Tag -->
+                        <ColumnDefinition Width="110"/>    <!-- Valor -->
+                        <ColumnDefinition Width="120"/>    <!-- Status -->
+                        <ColumnDefinition Width="Auto"/>   <!-- Btn -->
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
-                        <TextBlock Text="Data (DD/MM/AAAA):" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                        <TextBox x:Name="txtNovaData" Width="150"
-                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                 Foreground="White"
-                                 BorderBrush="#334155"
-                                 MaxLength="10"
-                                 PreviewTextInput="Data_PreviewTextInput"
-                                 PreviewKeyDown="Data_PreviewKeyDown"/>
-                    </StackPanel>
+                    <TextBox Grid.Column="0" x:Name="txtNovaData" Margin="0,0,12,0" Height="54"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             Foreground="White" BorderBrush="#334155" MaxLength="10"
+                             materialDesign:HintAssist.Hint="Data (DD/MM)"
+                             PreviewTextInput="Data_PreviewTextInput" PreviewKeyDown="Data_PreviewKeyDown"/>
 
-                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                        <TextBlock Text="Categoria:" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                         <ComboBox Width="120"
-                                  ItemsSource="{Binding Categorias}"
-                                  SelectedItem="{Binding NovaCategoriaSelecionada}"
-                                  Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                                  Foreground="White"
-                                  BorderBrush="#334155"/>
-                    </StackPanel>
+                    <ComboBox Grid.Column="1" Margin="0,0,12,0" Height="54"
+                              ItemsSource="{Binding Categorias}" SelectedItem="{Binding NovaCategoriaSelecionada}"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              Foreground="White" BorderBrush="#334155"
+                              materialDesign:HintAssist.Hint="Categoria"/>
 
-                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
-                        <TextBlock Text="Descrição/Serviço:" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                        <TextBox Text="{Binding NovoAluno, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                 Foreground="White"
-                                 BorderBrush="#334155"
-                                 materialDesign:TextFieldAssist.HasClearButton="True"/>
-                    </StackPanel>
+                    <TextBox Grid.Column="2" Margin="0,0,12,0" Height="54"
+                             Text="{Binding NovoAluno, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             Foreground="White" BorderBrush="#334155"
+                             materialDesign:HintAssist.Hint="Descrição/Serviço"
+                             materialDesign:TextFieldAssist.HasClearButton="True"/>
 
-                    <StackPanel Grid.Column="3" Margin="0,0,16,0">
-                        <Grid>
-                            <!-- Campo Duração (Visível apenas se Aula) -->
-                            <StackPanel>
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsNovaAula}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <TextBlock Text="Duração (h):" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                                <TextBox Width="80"
-                                         Text="{Binding NovaDuracao, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                         Foreground="White"
-                                         BorderBrush="#334155"
-                                         MaxLength="5"
-                                         PreviewTextInput="Duracao_PreviewTextInput"
-                                         PreviewKeyDown="Duracao_PreviewKeyDown"/>
-                            </StackPanel>
+                    <TextBox Grid.Column="3" Margin="0,0,12,0" Height="54"
+                             Text="{Binding NovaTag, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             Foreground="White" BorderBrush="#334155"
+                             materialDesign:HintAssist.Hint="Tag (ex: Samas)"
+                             materialDesign:TextFieldAssist.HasClearButton="True"/>
 
-                            <!-- Campo Valor Manual (Visível apenas se NÃO for Aula) -->
-                            <StackPanel>
-                                <StackPanel.Style>
-                                    <Style TargetType="StackPanel">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsNovaAula}" Value="False">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </StackPanel.Style>
-                                <TextBlock Text="Valor (R$):" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                                <TextBox Width="80"
-                                         Text="{Binding NovoValorStr, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource MaterialDesignOutlinedTextBox}"
-                                         Foreground="White"
-                                         BorderBrush="#334155"
-                                         materialDesign:HintAssist.Hint="0,00"/>
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
+                    <TextBox Grid.Column="4" Margin="0,0,12,0" Height="54"
+                             Text="{Binding NovoValorStr, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource MaterialDesignOutlinedTextBox}"
+                             Foreground="White" BorderBrush="#334155"
+                             materialDesign:HintAssist.Hint="Valor (R$)"/>
 
-                    <StackPanel Grid.Column="4" Margin="0,0,16,0">
-                        <TextBlock Text="Status:" Foreground="#94a3b8" FontSize="12" Margin="0,0,0,6"/>
-                        <ComboBox Width="120"
-                                  SelectedIndex="{Binding NovoStatusIndex}"
-                                  Style="{StaticResource MaterialDesignOutlinedComboBox}"
-                                  Foreground="White"
-                                  BorderBrush="#334155">
-                            <ComboBoxItem Content="Pendente"/>
-                            <ComboBoxItem Content="Pago"/>
-                        </ComboBox>
-                    </StackPanel>
+                    <ComboBox Grid.Column="5" Margin="0,0,12,0" Height="54"
+                              SelectedIndex="{Binding NovoStatusIndex}"
+                              Style="{StaticResource MaterialDesignOutlinedComboBox}"
+                              Foreground="White" BorderBrush="#334155"
+                              materialDesign:HintAssist.Hint="Status">
+                        <ComboBoxItem Content="Pendente"/>
+                        <ComboBoxItem Content="Pago"/>
+                    </ComboBox>
 
-                    <Button Grid.Column="5"
-                            Content="+ Adicionar"
-                            Background="#22c55e"
-                            BorderBrush="#22c55e"
-                            Foreground="White"
-                            Height="38"
-                            VerticalAlignment="Bottom"
-                            Padding="20,0"
-                            Click="Adicionar_Click"
-                            ToolTip="Adicionar Aula (Enter)"/>
+                    <Button Grid.Column="6" Content="+ Adicionar" Height="54"
+                            Background="#22c55e" BorderBrush="#22c55e" Foreground="White"
+                            Padding="20,0" Click="Adicionar_Click" ToolTip="Adicionar (Enter)"/>
                 </Grid>
             </StackPanel>
         </Grid>
@@ -285,7 +265,6 @@
                       Foreground="White"
                       BorderThickness="0"
                       GridLinesVisibility="None"
-                      RowHeight="40"
                       MouseDoubleClick="DataGrid_MouseDoubleClick">
                 
                 <DataGrid.Resources>
@@ -312,7 +291,7 @@
                         <Setter Property="BorderBrush" Value="#334155"/>
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                         <Setter Property="VerticalContentAlignment" Value="Center"/>
-                        <Setter Property="MinHeight" Value="40"/>
+                        <Setter Property="MinHeight" Value="42"/>
                     </Style>
                 </DataGrid.Resources>
 
@@ -358,17 +337,21 @@
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
                     
-                    <DataGridTextColumn Header="DESCRIÇÃO / SERVIÇO" Binding="{Binding NomeAula}" Width="*">
+                    <DataGridTemplateColumn Header="DESCRIÇÃO / SERVIÇO" Width="*" SortMemberPath="NomeAula">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding NomeAula}" 
+                                           TextWrapping="Wrap" 
+                                           VerticalAlignment="Center" 
+                                           Padding="10,6"
+                                           LineHeight="18"
+                                           ToolTip="{Binding NomeAula}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <DataGridTextColumn Header="TAG" Binding="{Binding Tag}" Width="120">
                         <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Setter Property="Padding" Value="10,0"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    
-                    <DataGridTextColumn Header="DURAÇÃO (h)" Binding="{Binding DuracaoFormatada}" Width="140">
-                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="HorizontalAlignment" Value="Center"/>
                                 <Setter Property="VerticalAlignment" Value="Center"/>

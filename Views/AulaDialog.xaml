@@ -6,7 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="Editar Serviço/Aula"
-        Height="450" Width="550"
+        Height="480" Width="550"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
@@ -37,6 +37,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -45,9 +46,6 @@
             </Grid.ColumnDefinitions>
 
             <!-- Data e Dia -->
-
-             <!-- Data e Dia -->
-
              <DatePicker x:Name="dtData"
                      Grid.Row="0" Grid.Column="0"
                      Margin="0,0,8,20"
@@ -61,11 +59,7 @@
                        materialDesign:HintAssist.Hint="Categoria"
                        SelectedValue="{Binding Categoria, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                        SelectedValuePath="Content">
-                 <ComboBoxItem Content="Aula"/>
-                 <ComboBoxItem Content="Serviço"/>
-                 <ComboBoxItem Content="Freelance"/>
-                 <ComboBoxItem Content="Manutenção"/>
-                 <ComboBoxItem Content="Outro"/>
+                 <!-- Items são populados via código (do banco) -->
              </ComboBox>
  
              <TextBox x:Name="txtDiaSemana"
@@ -85,66 +79,26 @@
                       materialDesign:HintAssist.Hint="Descrição / Nome do Aluno"
                       Text="{Binding NomeAula, Mode=TwoWay}"/>
  
-             <!-- Duração, Valor Hora e Total -->
-             <TextBox x:Name="txtDuracao"
-                      Grid.Row="2" Grid.Column="0"
-                      Margin="0,0,4,20"
-                      materialDesign:HintAssist.Hint="Duração (H ou H:MM)"
-                      materialDesign:TextFieldAssist.CharacterCounterVisibility="Collapsed"
-                      MaxLength="10">
-                 <TextBox.Style>
-                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
-                         <Setter Property="Visibility" Value="Collapsed"/>
-                         <Style.Triggers>
-                             <DataTrigger Binding="{Binding IsAula}" Value="True">
-                                 <Setter Property="Visibility" Value="Visible"/>
-                             </DataTrigger>
-                         </Style.Triggers>
-                     </Style>
-                 </TextBox.Style>
-             </TextBox>
+             <!-- Tag -->
+             <TextBox x:Name="txtTag"
+                      Grid.Row="2" Grid.ColumnSpan="3"
+                      Margin="0,0,0,20"
+                      Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                      materialDesign:HintAssist.Hint="Tag (Ex: Samas, Cliente X...)"
+                      Text="{Binding Tag, Mode=TwoWay}"/>
  
-             <TextBox x:Name="txtValorHora"
-                      Grid.Row="2" Grid.Column="1"
-                      Margin="4,0,4,20"
-                      materialDesign:HintAssist.Hint="R$ / Hora"
-                      Text="{Binding ValorHora, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                      ToolTip="Valor cobrado por hora nesta aula específica">
-                 <TextBox.Style>
-                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
-                         <Setter Property="Visibility" Value="Collapsed"/>
-                         <Style.Triggers>
-                             <DataTrigger Binding="{Binding IsAula}" Value="True">
-                                 <Setter Property="Visibility" Value="Visible"/>
-                             </DataTrigger>
-                         </Style.Triggers>
-                     </Style>
-                 </TextBox.Style>
-             </TextBox>
- 
+             <!-- Valor (sempre editável para todas as categorias) -->
              <TextBox x:Name="txtValor"
-                      Grid.Row="2" Grid.Column="2"
-                      Margin="4,0,0,20"
-                      materialDesign:HintAssist.Hint="Total (R$)"
+                      Grid.Row="3" Grid.ColumnSpan="3"
+                      Margin="0,0,0,20"
+                      Style="{StaticResource MaterialDesignFloatingHintTextBox}"
+                      materialDesign:HintAssist.Hint="Valor (R$)"
                       Text="{Binding Valor, StringFormat=N2, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                      FontWeight="Bold">
-                 <TextBox.Style>
-                     <Style TargetType="TextBox" BasedOn="{StaticResource MaterialDesignFloatingHintTextBox}">
-                         <Setter Property="IsReadOnly" Value="False"/>
-                         <Setter Property="Focusable" Value="True"/>
-                         <Style.Triggers>
-                             <DataTrigger Binding="{Binding IsAula}" Value="True">
-                                 <Setter Property="IsReadOnly" Value="True"/>
-                                 <Setter Property="Focusable" Value="False"/>
-                             </DataTrigger>
-                         </Style.Triggers>
-                     </Style>
-                 </TextBox.Style>
-             </TextBox>
+                      FontWeight="Bold"/>
 
             <!-- Status -->
             <ComboBox x:Name="cmbStatus"
-                      Grid.Row="3" Grid.ColumnSpan="3"
+                      Grid.Row="4" Grid.ColumnSpan="3"
                       Style="{StaticResource MaterialDesignFloatingHintComboBox}"
                       materialDesign:HintAssist.Hint="Status do Pagamento"
                       SelectedValuePath="Content"

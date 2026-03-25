@@ -23,7 +23,6 @@ namespace GestaoAulas.Repositories
         public AulaRepository(ILogger<AulaRepository> logger)
         {
             _logger = logger;
-            // Configura o caminho do banco. Em DEBUG, usa pasta local "DevData". Em RELEASE, usa AppData.
 #if DEBUG
             string pasta = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DevData");
 #else
@@ -37,10 +36,7 @@ namespace GestaoAulas.Repositories
             string dbPath = Path.Combine(pasta, "aulas.db");
             _connectionString = $"Data Source={dbPath}";
             
-            // Tenta mapear snake_case (banco) para PascalCase (C#)
             Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
-            
-            // Registra handler para conversão de decimais (correção para valores vindo como 0)
             SqlMapper.AddTypeHandler(new GestaoAulas.Infrastructure.DecimalTypeHandler());
         }
 
@@ -53,7 +49,6 @@ namespace GestaoAulas.Repositories
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
 
-                // Cria tabela se não existir (SQL manual ainda necessário para DDL)
                 var sql = @"
                     PRAGMA journal_mode=WAL;
                     CREATE TABLE IF NOT EXISTS aulas (
@@ -61,6 +56,7 @@ namespace GestaoAulas.Repositories
                         data TEXT NOT NULL,
                         dia_semana TEXT NOT NULL,
                         nome_aula TEXT NOT NULL,
+                        tag TEXT NOT NULL DEFAULT '',
                         duracao REAL NOT NULL,
                         valor REAL NOT NULL,
                         valor_hora REAL NOT NULL DEFAULT 0,
@@ -68,18 +64,38 @@ namespace GestaoAulas.Repositories
                         status TEXT NOT NULL DEFAULT 'Pendente',
                         data_criacao TEXT NOT NULL,
                         data_atualizacao TEXT NOT NULL
-                    )";
+                    );
+                    CREATE TABLE IF NOT EXISTS categorias (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        nome TEXT NOT NULL UNIQUE
+                    );";
                 
                 await conn.ExecuteAsync(sql).ConfigureAwait(false);
 
-                // Migração rápida
-                try {
-                    await conn.ExecuteAsync("ALTER TABLE aulas ADD COLUMN valor_hora REAL NOT NULL DEFAULT 0").ConfigureAwait(false);
-                } catch { /* Já existe */ }
+                // Migração de colunas existentes
+                var existingColumns = (await conn.QueryAsync<string>(
+                    "SELECT name FROM pragma_table_info('aulas')").ConfigureAwait(false)).AsList();
 
-                try {
+                if (!existingColumns.Contains("valor_hora"))
+                    await conn.ExecuteAsync("ALTER TABLE aulas ADD COLUMN valor_hora REAL NOT NULL DEFAULT 0").ConfigureAwait(false);
+
+                if (!existingColumns.Contains("categoria"))
                     await conn.ExecuteAsync("ALTER TABLE aulas ADD COLUMN categoria TEXT NOT NULL DEFAULT 'Aula'").ConfigureAwait(false);
-                } catch { /* Já existe */ }
+
+                if (!existingColumns.Contains("tag"))
+                    await conn.ExecuteAsync("ALTER TABLE aulas ADD COLUMN tag TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+
+                // Popula categorias padrão se a tabela estiver vazia
+                var count = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM categorias").ConfigureAwait(false);
+                if (count == 0)
+                {
+                    var categPadrao = new[] { "Aula", "Serviço", "Freelance", "Manutenção", "Outro" };
+                    foreach (var c in categPadrao)
+                    {
+                        await conn.ExecuteAsync("INSERT OR IGNORE INTO categorias (nome) VALUES (@Nome)", new { Nome = c }).ConfigureAwait(false);
+                    }
+                    _logger.LogInformation("Categorias padrão inseridas no banco.");
+                }
 
                 _logger.LogInformation("Banco de dados inicializado com sucesso em: {Path}", _connectionString);
             }
@@ -94,15 +110,15 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Iniciando inserção de aula: Data={Data}, Nome={Nome}, Duracao={Duracao}, Valor={Valor}, ValorHora={ValorHora}, Status={Status}",
-                    aula.Data, aula.NomeAula, aula.Duracao, aula.Valor, aula.ValorHora, aula.Status);
+                _logger.LogDebug("Inserindo aula: Data={Data}, Nome={Nome}, Valor={Valor}, Status={Status}",
+                    aula.Data, aula.NomeAula, aula.Valor, aula.Status);
                 
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
                 
                 var sql = @"
-                    INSERT INTO aulas (data, dia_semana, nome_aula, duracao, valor, valor_hora, categoria, status, data_criacao, data_atualizacao)
-                    VALUES (@Data, @DiaSemana, @NomeAula, @Duracao, @Valor, @ValorHora, @Categoria, @Status, @DataCriacao, @DataAtualizacao);
+                    INSERT INTO aulas (data, dia_semana, nome_aula, tag, duracao, valor, valor_hora, categoria, status, data_criacao, data_atualizacao)
+                    VALUES (@Data, @DiaSemana, @NomeAula, @Tag, @Duracao, @Valor, @ValorHora, @Categoria, @Status, @DataCriacao, @DataAtualizacao);
                     SELECT last_insert_rowid();";
                 
                 var parametros = new
@@ -110,8 +126,8 @@ namespace GestaoAulas.Repositories
                     Data = aula.Data.ToString("yyyy-MM-dd"),
                     DiaSemana = aula.DiaSemana,
                     NomeAula = aula.NomeAula,
+                    Tag = aula.Tag ?? "",
                     Duracao = aula.Duracao,
-                    // Armazena como texto para preservar precisão financeira decimal (Fix #17)
                     Valor = aula.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ValorHora = aula.ValorHora.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     Categoria = aula.Categoria,
@@ -136,7 +152,7 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Iniciando atualização de aula ID={Id}", aula.Id);
+                _logger.LogDebug("Atualizando aula ID={Id}", aula.Id);
                 
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
@@ -148,6 +164,7 @@ namespace GestaoAulas.Repositories
                         data = @Data, 
                         dia_semana = @DiaSemana, 
                         nome_aula = @NomeAula, 
+                        tag = @Tag,
                         duracao = @Duracao, 
                         valor = @Valor, 
                         valor_hora = @ValorHora,
@@ -162,8 +179,8 @@ namespace GestaoAulas.Repositories
                     Data = aula.Data.ToString("yyyy-MM-dd"),
                     DiaSemana = aula.DiaSemana,
                     NomeAula = aula.NomeAula,
+                    Tag = aula.Tag ?? "",
                     Duracao = aula.Duracao,
-                    // Armazena como texto para preservar precisão financeira decimal (Fix #17)
                     Valor = aula.Valor.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ValorHora = aula.ValorHora.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     Categoria = aula.Categoria,
@@ -175,7 +192,7 @@ namespace GestaoAulas.Repositories
                 bool sucesso = affected > 0;
                 
                 if (sucesso)
-                    _logger.LogInformation("Aula atualizada com sucesso. ID={Id}", aula.Id);
+                    _logger.LogInformation("Aula atualizada. ID={Id}", aula.Id);
                 else
                     _logger.LogWarning("Aula não encontrada para atualização. ID={Id}", aula.Id);
                     
@@ -192,7 +209,7 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Iniciando exclusão de aula ID={Id}", id);
+                _logger.LogDebug("Excluindo aula ID={Id}", id);
                 
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
@@ -201,7 +218,7 @@ namespace GestaoAulas.Repositories
                 bool sucesso = affected > 0;
                 
                 if (sucesso)
-                    _logger.LogInformation("Aula excluída com sucesso. ID={Id}", id);
+                    _logger.LogInformation("Aula excluída. ID={Id}", id);
                 else
                     _logger.LogWarning("Aula não encontrada para exclusão. ID={Id}", id);
                     
@@ -218,20 +235,11 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Buscando aula por ID={Id}", id);
-                
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
                 
                 var sql = "SELECT * FROM aulas WHERE id = @Id";
-                var aula = await conn.QueryFirstOrDefaultAsync<Aula>(sql, new { Id = id }).ConfigureAwait(false);
-                
-                if (aula != null)
-                    _logger.LogDebug("Aula encontrada. ID={Id}, Nome={Nome}", id, aula.NomeAula);
-                else
-                    _logger.LogDebug("Aula não encontrada. ID={Id}", id);
-                    
-                return aula;
+                return await conn.QueryFirstOrDefaultAsync<Aula>(sql, new { Id = id }).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -240,16 +248,15 @@ namespace GestaoAulas.Repositories
             }
         }
 
-        public async Task<List<Aula>> ObterTodasAsync(int? mes = null, int? ano = null, string? termoBusca = null)
+        public async Task<List<Aula>> ObterTodasAsync(int? mes = null, int? ano = null, string? termoBusca = null, string? filtroStatus = null)
         {
             try
             {
-                _logger.LogDebug("Buscando aulas. Filtros: Mes={Mes}, Ano={Ano}, Busca={Busca}", mes, ano, termoBusca);
+                _logger.LogDebug("Buscando aulas. Filtros: Mes={Mes}, Ano={Ano}, Busca={Busca}, Status={Status}", mes, ano, termoBusca, filtroStatus);
                 
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
                 
-                // Base query com Dapper Builder ou SQL dinâmico
                 var sql = "SELECT * FROM aulas WHERE 1=1";
                 var parametros = new DynamicParameters();
 
@@ -267,8 +274,14 @@ namespace GestaoAulas.Repositories
 
                 if (!string.IsNullOrWhiteSpace(termoBusca))
                 {
-                    sql += " AND (nome_aula LIKE @Busca OR data LIKE @Busca)";
+                    sql += " AND (nome_aula LIKE @Busca OR tag LIKE @Busca OR data LIKE @Busca)";
                     parametros.Add("@Busca", $"%{termoBusca}%");
+                }
+
+                if (!string.IsNullOrWhiteSpace(filtroStatus) && filtroStatus != "Todos")
+                {
+                    sql += " AND status = @FiltroStatus";
+                    parametros.Add("@FiltroStatus", filtroStatus);
                 }
 
                 sql += " ORDER BY data DESC";
@@ -276,12 +289,12 @@ namespace GestaoAulas.Repositories
                 var result = await conn.QueryAsync<Aula>(sql, parametros).ConfigureAwait(false);
                 var lista = result.AsList();
                 
-                _logger.LogInformation("Aulas carregadas. Total={Count}, Mes={Mes}, Ano={Ano}", lista.Count, mes, ano);
+                _logger.LogInformation("Aulas carregadas. Total={Count}", lista.Count);
                 return lista;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao buscar aulas. Filtros: Mes={Mes}, Ano={Ano}, Busca={Busca}", mes, ano, termoBusca);
+                _logger.LogError(ex, "Erro ao buscar aulas.");
                 throw;
             }
         }
@@ -290,8 +303,6 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Buscando anos disponíveis no banco");
-                
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
                 
@@ -305,7 +316,6 @@ namespace GestaoAulas.Repositories
                         anos.Add(ano);
                 }
                 
-                _logger.LogDebug("Anos disponíveis: {Anos}", string.Join(", ", anos));
                 return anos;
             }
             catch (Exception ex)
@@ -319,19 +329,101 @@ namespace GestaoAulas.Repositories
         {
             try
             {
-                _logger.LogDebug("Iniciando backup do banco para: {Path}", destinationPath);
+                var fullPath = Path.GetFullPath(destinationPath);
+                if (!fullPath.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException("O caminho de backup deve terminar com .db");
                 
                 using var conn = GetConnection();
                 await conn.OpenAsync().ConfigureAwait(false);
                 
-                // Sanitiza o path para evitar problemas com aspas simples no caminho
-                var safePath = destinationPath.Replace("'", "''");
+                var safePath = fullPath.Replace("'", "''");
                 await conn.ExecuteAsync($"VACUUM INTO '{safePath}'").ConfigureAwait(false);
-                _logger.LogInformation("Backup realizado com sucesso. Destino={Destination}", destinationPath);
+                _logger.LogInformation("Backup realizado. Destino={Destination}", fullPath);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao realizar backup para: {Path}", destinationPath);
+                throw;
+            }
+        }
+
+        public async Task<decimal> ObterTotalPendenteAnoAsync(int? ano)
+        {
+            try
+            {
+                using var conn = GetConnection();
+                await conn.OpenAsync().ConfigureAwait(false);
+
+                var sql = "SELECT COALESCE(SUM(CAST(valor AS REAL)), 0) FROM aulas WHERE status = 'Pendente'";
+                var parametros = new DynamicParameters();
+
+                if (ano.HasValue)
+                {
+                    sql += " AND strftime('%Y', data) = @Ano";
+                    parametros.Add("@Ano", ano.Value.ToString("D4"));
+                }
+
+                var result = await conn.ExecuteScalarAsync<double>(sql, parametros).ConfigureAwait(false);
+                return (decimal)result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao calcular total pendente do ano {Ano}", ano);
+                return 0m;
+            }
+        }
+
+        // --- Categorias ---
+
+        public async Task<List<string>> ObterCategoriasAsync()
+        {
+            try
+            {
+                using var conn = GetConnection();
+                await conn.OpenAsync().ConfigureAwait(false);
+                
+                var result = await conn.QueryAsync<string>("SELECT nome FROM categorias ORDER BY id").ConfigureAwait(false);
+                return result.AsList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar categorias");
+                return new List<string> { "Aula", "Serviço", "Freelance", "Manutenção", "Outro" };
+            }
+        }
+
+        public async Task AdicionarCategoriaAsync(string categoria)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(categoria)) return;
+                
+                using var conn = GetConnection();
+                await conn.OpenAsync().ConfigureAwait(false);
+                
+                await conn.ExecuteAsync("INSERT OR IGNORE INTO categorias (nome) VALUES (@Nome)", new { Nome = categoria.Trim() }).ConfigureAwait(false);
+                _logger.LogInformation("Categoria adicionada: {Categoria}", categoria);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao adicionar categoria: {Categoria}", categoria);
+                throw;
+            }
+        }
+
+        public async Task RemoverCategoriaAsync(string categoria)
+        {
+            try
+            {
+                using var conn = GetConnection();
+                await conn.OpenAsync().ConfigureAwait(false);
+                
+                await conn.ExecuteAsync("DELETE FROM categorias WHERE nome = @Nome", new { Nome = categoria }).ConfigureAwait(false);
+                _logger.LogInformation("Categoria removida: {Categoria}", categoria);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao remover categoria: {Categoria}", categoria);
                 throw;
             }
         }

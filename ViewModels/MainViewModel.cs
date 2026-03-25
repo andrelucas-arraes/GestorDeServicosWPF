@@ -33,9 +33,14 @@ namespace GestaoAulas.ViewModels
             _dialogService = dialogService;
             _validator = validator;
             _logger = logger;
+        }
 
-            // Inicialização de dados
-            CarregarDadosIniciaisCommand.Execute(null);
+        /// <summary>
+        /// Inicializa o ViewModel carregando dados de forma assíncrona.
+        /// </summary>
+        public async Task InitializeAsync()
+        {
+            await CarregarDadosIniciaisAsync();
         }
 
         // --- Propriedades Observáveis ---
@@ -59,6 +64,9 @@ namespace GestaoAulas.ViewModels
         [ObservableProperty]
         private string _termoBusca = string.Empty;
 
+        [ObservableProperty]
+        private string _filtroStatusSelecionado = "Todos";
+
         // Dashboard
         [ObservableProperty] 
         [NotifyPropertyChangedFor(nameof(TotalHorasFormatado))]
@@ -72,30 +80,31 @@ namespace GestaoAulas.ViewModels
         [NotifyPropertyChangedFor(nameof(TotalPendenteFormatado))]
         private decimal _totalPendente;
 
+        [ObservableProperty] 
+        [NotifyPropertyChangedFor(nameof(TotalPendenteAnoFormatado))]
+        private decimal _totalPendenteAno;
+
         [ObservableProperty] private int _totalAulas;
 
         // Form Rápido
         [ObservableProperty] private DateTime? _novaData = DateTime.Now;
         [ObservableProperty] private string _novoAluno = string.Empty;
-        [ObservableProperty] private string _novaDuracao = "1:00";
+        [ObservableProperty] private string _novoValorStr = "";
         [ObservableProperty] private int _novoStatusIndex = 0;
         
         [ObservableProperty] 
-        [NotifyPropertyChangedFor(nameof(IsNovaAula))]
         private string _novaCategoriaSelecionada = "Aula";
 
         public bool IsNovaAula => NovaCategoriaSelecionada == "Aula";
 
-        [ObservableProperty] private string _novoValorStr = "";
+        [ObservableProperty] private string _novaTag = string.Empty;
 
         // Listas Auxiliares
-        public ObservableCollection<string> Categorias { get; } = new() 
-        { 
-            "Aula", 
-            "Serviço", 
-            "Freelance", 
-            "Manutenção", 
-            "Outro" 
+        public ObservableCollection<string> Categorias { get; } = new();
+
+        public ObservableCollection<string> FiltroStatusOptions { get; } = new()
+        {
+            "Todos", "Pendente", "Pago"
         };
 
         public ObservableCollection<KeyValuePair<int, string>> Meses { get; } = new()
@@ -109,8 +118,13 @@ namespace GestaoAulas.ViewModels
 
         // --- Hooks de Propriedades ---
         private Guid _currentLoadId;
-        private bool _suppressAutoLoad; // Evita recargas em cascata ao mudar filtros programaticamente
-        private CancellationTokenSource? _debounceCts; // Debounce com cancelamento
+        private bool _suppressAutoLoad;
+        private CancellationTokenSource? _debounceCts;
+
+        partial void OnNovaCategoriaSelecionadaChanged(string value)
+        {
+            OnPropertyChanged(nameof(IsNovaAula));
+        }
 
         async partial void OnMesSelecionadoChanged(int? value) 
         {
@@ -126,12 +140,19 @@ namespace GestaoAulas.ViewModels
             catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnAnoSelecionadoChanged"); }
         }
 
+        async partial void OnFiltroStatusSelecionadoChanged(string value)
+        {
+            if (_suppressAutoLoad) return;
+            try { await CarregarDadosAsync(); }
+            catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnFiltroStatusSelecionadoChanged"); }
+        }
+
         async partial void OnTermoBuscaChanged(string value) 
         {
             try
             {
-                // Cancela o debounce anterior
                 _debounceCts?.Cancel();
+                _debounceCts?.Dispose();
                 var cts = new CancellationTokenSource();
                 _debounceCts = cts;
                 
@@ -140,7 +161,7 @@ namespace GestaoAulas.ViewModels
                 
                 await CarregarDadosAsync();
             }
-            catch (OperationCanceledException) { /* esperado: debounce cancelado */ }
+            catch (OperationCanceledException) { }
             catch (Exception ex) { _logger.LogError(ex, "Erro no hook OnTermoBuscaChanged"); }
         }
 
@@ -154,7 +175,7 @@ namespace GestaoAulas.ViewModels
             _suppressAutoLoad = true;
             try
             {
-                // Primeiro carrega os anos (isso popula a lista do ComboBox)
+                await CarregarCategoriasAsync();
                 await CarregarAnosAsync();
             }
             finally
@@ -162,10 +183,65 @@ namespace GestaoAulas.ViewModels
                 _suppressAutoLoad = false;
             }
             
-            // Agora faz um único carregamento com os filtros já definidos
             await CarregarDadosAsync();
             
             _logger.LogInformation("Inicialização de dados concluída.");
+        }
+
+        private async Task CarregarCategoriasAsync()
+        {
+            try
+            {
+                var categoriasDb = await _repository.ObterCategoriasAsync();
+                Categorias.Clear();
+                foreach (var cat in categoriasDb)
+                    Categorias.Add(cat);
+
+                // Garante que a categoria selecionada padrão exista
+                if (!Categorias.Contains(NovaCategoriaSelecionada) && Categorias.Count > 0)
+                    NovaCategoriaSelecionada = Categorias[0];
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao carregar categorias");
+                if (Categorias.Count == 0)
+                {
+                    Categorias.Add("Aula");
+                    Categorias.Add("Serviço");
+                    Categorias.Add("Freelance");
+                    Categorias.Add("Manutenção");
+                    Categorias.Add("Outro");
+                }
+            }
+        }
+
+        [RelayCommand]
+        private async Task AdicionarCategoriaAsync(string novaCategoria)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(novaCategoria))
+                {
+                    _dialogService.ShowMessage("O nome da categoria não pode ser vazio.", "Validação");
+                    return;
+                }
+
+                var nome = novaCategoria.Trim();
+                if (Categorias.Contains(nome))
+                {
+                    _dialogService.ShowMessage("Essa categoria já existe.", "Validação");
+                    return;
+                }
+
+                await _repository.AdicionarCategoriaAsync(nome);
+                Categorias.Add(nome);
+                _logger.LogInformation("Nova categoria adicionada: {Categoria}", nome);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao adicionar categoria");
+                _dialogService.ShowMessage($"Erro ao adicionar categoria: {ex.Message}", "Erro");
+            }
         }
 
         [RelayCommand]
@@ -174,7 +250,6 @@ namespace GestaoAulas.ViewModels
             var sw = System.Diagnostics.Stopwatch.StartNew();
             try
             {
-                // Valida data
                 if (!NovaData.HasValue)
                 {
                     _dialogService.ShowMessage("Selecione uma data.", "Erro");
@@ -183,75 +258,47 @@ namespace GestaoAulas.ViewModels
 
                 DateTime data = NovaData.Value;
 
-                // Usa o parser robusto do FormatUtils (Mesma lógica do Diálogo)
-                if (!GestaoAulas.Utils.FormatUtils.TryParseDuracao(NovaDuracao, out double duracaoHoras))
+                // Valida valor para todas as categorias
+                if (!GestaoAulas.Utils.FormatUtils.TryParseDecimal(NovoValorStr, out decimal valorFinal))
                 {
-                     _dialogService.ShowMessage("Duração inválida. Use o formato H:MM (ex: 1:30) ou decimal (ex: 1.5).", "Erro");
-                     return;
+                    _dialogService.ShowMessage("Valor inválido. Informe um valor numérico válido (ex: 50,00).", "Erro");
+                    return;
                 }
-
-                // (Lógica redundante removida)
 
                 var novaAula = Aula.CriarNova();
                 novaAula.Data = data;
                 novaAula.NomeAula = NovoAluno;
                 novaAula.Categoria = NovaCategoriaSelecionada;
+                novaAula.Tag = NovaTag?.Trim() ?? "";
                 novaAula.Status = NovoStatusIndex == 1 ? "Pago" : "Pendente";
+                novaAula.Valor = valorFinal;
+                novaAula.Duracao = 0;
 
-                if (IsNovaAula)
-                {
-                    novaAula.Duracao = duracaoHoras;
-                    novaAula.RecalcularValor();
-                }
-                else
-                {
-                    // Se nao for aula, a duração é 0
-                    novaAula.Duracao = 0; 
-                    
-                    if (GestaoAulas.Utils.FormatUtils.TryParseDecimal(NovoValorStr, out decimal valorManual))
-                    {
-                        novaAula.Valor = valorManual;
-                    }
-                    else
-                    {
-                        // Fallback: Tenta limpar mascaras básicas se o utilitário falhar (improvável)
-                        string clean = NovoValorStr.Replace("R$", "").Trim();
-                        if (decimal.TryParse(clean, out decimal v)) novaAula.Valor = v;
-                    }
-                }
+                _logger.LogDebug("Validando nova aula: {Aluno}", NovoAluno);
 
-                _logger.LogDebug("Iniciando validação e inserção de nova aula: {Aluno}", NovoAluno);
-
-                // Validação via FluentValidation
                 var result = await _validator.ValidateAsync(novaAula);
                 if (!result.IsValid)
                 {
-                    _logger.LogWarning("Validação falhou para nova aula: {Error}", result.Errors[0].ErrorMessage);
+                    _logger.LogWarning("Validação falhou: {Error}", result.Errors[0].ErrorMessage);
                     _dialogService.ShowMessage(result.Errors[0].ErrorMessage, "Validação");
                     return;
                 }
 
-                // Inserir
                 await _repository.InserirAsync(novaAula);
                 
-                // Salva o ano e mês da aula recém adicionada para ajustar o filtro
                 int anoAula = novaAula.Data.Year;
                 int mesAula = novaAula.Data.Month;
 
                 // Limpar Form
                 NovaData = DateTime.Now;
                 NovoAluno = string.Empty;
-                NovaDuracao = "1:00";
                 NovoStatusIndex = 0;
-                // Mantém a categoria selecionada para facilitar entradas sequenciais
                 NovoValorStr = "";
+                NovaTag = "";
 
                 string msgSucesso = $"{novaAula.Categoria} registrado(a)!";
-                if (novaAula.Categoria == "Aula") msgSucesso = "Aula registrada!";
-                
                 _dialogService.ShowMessage(msgSucesso, "Sucesso");
 
-                // Atualiza filtros para o período da aula adicionada (para que o usuário veja que salvou)
                 _suppressAutoLoad = true;
                 try
                 {
@@ -264,17 +311,16 @@ namespace GestaoAulas.ViewModels
                     _suppressAutoLoad = false;
                 }
                 
-                // Um único carregamento final com filtros já definidos
                 await CarregarDadosAsync();
                 
                 sw.Stop();
-                _logger.LogInformation("Nova aula registrada com sucesso em {Elapsed}ms. Aluno: {Aluno}", sw.ElapsedMilliseconds, novaAula.NomeAula);
+                _logger.LogInformation("Registro salvo em {Elapsed}ms. Nome: {Aluno}", sw.ElapsedMilliseconds, novaAula.NomeAula);
             }
             catch (Exception ex)
             {
                 sw.Stop();
-                _logger.LogError(ex, "Erro ao adicionar aula após {Elapsed}ms. Aluno={NovoAluno}", sw.ElapsedMilliseconds, NovoAluno);
-                _dialogService.ShowMessage($"Erro ao salvar aula:\n\n{ex.Message}\n\nDetalhes: {ex.GetType().Name}", "Erro");
+                _logger.LogError(ex, "Erro ao adicionar aula após {Elapsed}ms", sw.ElapsedMilliseconds);
+                _dialogService.ShowMessage("Erro ao salvar o registro. Verifique os dados e tente novamente.", "Erro");
             }
         }
 
@@ -285,22 +331,14 @@ namespace GestaoAulas.ViewModels
             
             try
             {
-                _logger.LogDebug("Abrindo edição de aula. ID={Id}, Nome={Nome}", AulaSelecionada.Id, AulaSelecionada.NomeAula);
-                
-                // Clone para não afetar a lista antes de salvar
                 var clone = AulaSelecionada.Clone();
                 
                 if (_dialogService.ShowAulaDialog(clone))
                 {
-                    _logger.LogInformation("Salvando alterações da aula ID={Id}", clone.Id);
                     await _repository.AtualizarAsync(clone);
-                    await CarregarAnosAsync(); // Pode ter mudado o ano da aula
+                    await CarregarAnosAsync();
                     await CarregarDadosAsync();
-                    _logger.LogInformation("Aula editada com sucesso. ID={Id}, Nome={Nome}", clone.Id, clone.NomeAula);
-                }
-                else
-                {
-                    _logger.LogDebug("Edição de aula cancelada pelo usuário. ID={Id}", AulaSelecionada.Id);
+                    _logger.LogInformation("Aula editada. ID={Id}", clone.Id);
                 }
             }
             catch (Exception ex)
@@ -318,28 +356,21 @@ namespace GestaoAulas.ViewModels
 
             try
             {
-                _logger.LogDebug("Solicitando confirmação para excluir aula. ID={Id}, Nome={Nome}", AulaSelecionada.Id, AulaSelecionada.NomeAula);
-                
-                if (_dialogService.Confirm($"Excluir aula de {AulaSelecionada.NomeAula}?", "Confirmar"))
+                if (_dialogService.Confirm($"Excluir registro de {AulaSelecionada.NomeAula}?", "Confirmar"))
                 {
                     var idExcluir = AulaSelecionada.Id;
-                    var nomeExcluir = AulaSelecionada.NomeAula;
                     
                     await _repository.ExcluirAsync(idExcluir);
-                    await CarregarAnosAsync(); // Pode ter removido o último registro de um ano
+                    await CarregarAnosAsync();
                     await CarregarDadosAsync();
                     
-                    _logger.LogInformation("Aula excluída com sucesso. ID={Id}, Nome={Nome}", idExcluir, nomeExcluir);
-                }
-                else
-                {
-                    _logger.LogDebug("Exclusão cancelada pelo usuário. ID={Id}", AulaSelecionada.Id);
+                    _logger.LogInformation("Registro excluído. ID={Id}", idExcluir);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao excluir aula ID={Id}", AulaSelecionada?.Id);
-                _dialogService.ShowMessage($"Erro ao excluir aula:\n\n{ex.Message}", "Erro");
+                _dialogService.ShowMessage($"Erro ao excluir:\n\n{ex.Message}", "Erro");
             }
         }
 
@@ -353,31 +384,24 @@ namespace GestaoAulas.ViewModels
         {
             if (AulaSelecionada == null) return;
             
-            // Salva informações antes de recarregar (pois AulaSelecionada pode ficar null)
-            var aulaId = AulaSelecionada.Id;
-            var statusAnterior = AulaSelecionada.Status;
+            var aula = AulaSelecionada;
+            var aulaId = aula.Id;
             
             try
             {
-                _logger.LogDebug("Alterando status da aula. ID={Id}, StatusAnterior={StatusAnterior}, NovoStatus={NovoStatus}", 
-                    aulaId, statusAnterior, status);
+                var clone = aula.Clone();
+                clone.Status = status;
+                clone.DataAtualizacao = DateTime.Now;
                 
-                AulaSelecionada.Status = status;
-                await _repository.AtualizarAsync(AulaSelecionada);
+                await _repository.AtualizarAsync(clone);
                 await CarregarDadosAsync();
                 
-                _logger.LogInformation("Status da aula alterado. ID={Id}, NovoStatus={Status}", aulaId, status);
+                _logger.LogInformation("Status alterado. ID={Id}, NovoStatus={Status}", aulaId, status);
             }
             catch (Exception ex)
             {
-                // Rollback do status em caso de falha no banco
-                if (AulaSelecionada != null && AulaSelecionada.Id == aulaId)
-                {
-                    AulaSelecionada.Status = statusAnterior;
-                }
-                
-                _logger.LogError(ex, "Erro ao alterar status da aula ID={Id} para {Status}. Rollback para {StatusAnterior}", aulaId, status, statusAnterior);
-                _dialogService.ShowMessage($"Erro ao alterar status:\n\n{ex.Message}", "Erro");
+                _logger.LogError(ex, "Erro ao alterar status da aula ID={Id}", aulaId);
+                _dialogService.ShowMessage("Erro ao alterar status. Tente novamente.", "Erro");
             }
         }
 
@@ -388,9 +412,6 @@ namespace GestaoAulas.ViewModels
             {
                 int? mes = MesSelecionado > 0 ? MesSelecionado : null;
                 int? ano = AnoSelecionado > 0 ? AnoSelecionado : null;
-                
-                _logger.LogInformation("Abrindo diálogo de exportação. Total de aulas={Count}, Mes={Mes}, Ano={Ano}", 
-                    _cacheAulasBanco.Count, mes, ano);
                     
                 _dialogService.ShowExportDialog(_cacheAulasBanco, mes, ano);
             }
@@ -406,9 +427,7 @@ namespace GestaoAulas.ViewModels
         {
             try
             {
-                _logger.LogDebug("Abrindo diálogo de configurações");
                 _dialogService.ShowConfiguracoesDialog();
-                _logger.LogDebug("Diálogo de configurações fechado");
             }
             catch (Exception ex)
             {
@@ -417,11 +436,24 @@ namespace GestaoAulas.ViewModels
             }
         }
 
+        [RelayCommand]
+        private void AbrirAnalises()
+        {
+            try
+            {
+                _dialogService.ShowAnalisesDialog(_cacheAulasBanco);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao abrir análises");
+                _dialogService.ShowMessage($"Erro ao abrir análises:\n\n{ex.Message}", "Erro");
+            }
+        }
+
         // --- Métodos Privados ---
 
         private async Task CarregarDadosAsync()
         {
-            // Gera um ID único para esta solicitação
             var loadId = Guid.NewGuid();
             _currentLoadId = loadId;
             
@@ -431,74 +463,69 @@ namespace GestaoAulas.ViewModels
             {
                 int? mes = MesSelecionado > 0 ? MesSelecionado : null;
                 int? ano = AnoSelecionado > 0 ? AnoSelecionado : null;
-
-                _logger.LogDebug("Iniciando carregamento de dados. ReqID={ReqId}, Filtros: Mes={Mes}, Ano={Ano}, Busca={Busca}", 
-                    loadId, mes, ano, TermoBusca);
+                string? filtroStatus = FiltroStatusSelecionado != "Todos" ? FiltroStatusSelecionado : null;
                 
-                // Busca no banco (assíncrono)
-                var dadosBanco = await _repository.ObterTodasAsync(mes, ano, TermoBusca);
+                var dadosBanco = await _repository.ObterTodasAsync(mes, ano, TermoBusca, filtroStatus);
                 
-                // Se o ID da solicitação mudou durante o await, significa que uma nova busca foi iniciada.
-                // Descartamos este resultado para evitar condição de corrida (dados antigos sobrescrevendo novos).
                 if (_currentLoadId != loadId)
                 {
-                     _logger.LogDebug("Resultado de carregamento descartado por obsolescência. ReqID={ReqId}", loadId);
                      return;
                 }
 
-                // Atualiza coleção
                 _cacheAulasBanco = dadosBanco;
                 Aulas = new ObservableCollection<Aula>(_cacheAulasBanco);
                 
-                CalcularEstatisticas();
+                await CalcularEstatisticasAsync();
                 
                 sw.Stop();
-                _logger.LogInformation("Dados carregados com sucesso em {Elapsed}ms. ReqID={ReqId}, Total exibido: {Count}", 
-                    sw.ElapsedMilliseconds, loadId, Aulas.Count);
+                _logger.LogInformation("Dados carregados em {Elapsed}ms. Total: {Count}", sw.ElapsedMilliseconds, Aulas.Count);
             }
             catch (Exception ex)
             {
                 if (sw.IsRunning) sw.Stop();
-                _logger.LogError(ex, "Falha ao carregar dados. Tempo decorrido: {Elapsed}ms", sw.ElapsedMilliseconds);
+                _logger.LogError(ex, "Falha ao carregar dados. Tempo: {Elapsed}ms", sw.ElapsedMilliseconds);
                 _dialogService.ShowMessage($"Erro ao carregar dados:\n\n{ex.Message}", "Erro");
             }
         }
 
-        // Método FiltrarLocalmente removido pois o filtro agora é no SQL (Performance Tuning)
-
-
-        private void CalcularEstatisticas()
+        private async Task CalcularEstatisticasAsync()
         {
             TotalHoras = _cacheAulasBanco.Where(a => a.Categoria == "Aula").Sum(a => a.Duracao);
             TotalRecebido = _cacheAulasBanco.Where(a => a.Status == "Pago").Sum(a => a.Valor);
             TotalPendente = _cacheAulasBanco.Where(a => a.Status == "Pendente").Sum(a => a.Valor);
             TotalAulas = _cacheAulasBanco.Count;
+
+            try
+            {
+                int? ano = AnoSelecionado > 0 ? AnoSelecionado : null;
+                TotalPendenteAno = await _repository.ObterTotalPendenteAnoAsync(ano);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao calcular total pendente do ano");
+                TotalPendenteAno = 0;
+            }
         }
 
         private async Task CarregarAnosAsync()
         {
             try
             {
-                _logger.LogDebug("Atualizando lista de anos disponíveis...");
                 var anosDb = await _repository.ObterAnosDisponiveisAsync();
                 
                 if (!anosDb.Contains(DateTime.Now.Year)) 
                     anosDb.Add(DateTime.Now.Year);
                 
-                // Preserva o ano atual selecionado
                 var anoAtual = AnoSelecionado;
 
                 Anos.Clear();
                 foreach (var ano in anosDb.OrderByDescending(x => x)) 
                     Anos.Add(ano);
                 
-                // Tenta restaurar o ano que estava selecionado ou seleciona o primeiro
                 if (anoAtual.HasValue && Anos.Contains(anoAtual.Value))
                     AnoSelecionado = anoAtual;
                 else if (Anos.Count > 0)
                     AnoSelecionado = Anos[0];
-                    
-                _logger.LogDebug("Filtro de anos atualizado. Total: {Count}", Anos.Count);
             }
             catch (Exception ex)
             {
@@ -506,7 +533,7 @@ namespace GestaoAulas.ViewModels
             }
         }
 
-        // Propriedades Formatadas para Dashboard (Helpers)
+        // Propriedades Formatadas para Dashboard
         public string TotalHorasFormatado 
         {
             get 
@@ -516,7 +543,9 @@ namespace GestaoAulas.ViewModels
                 return $"{h}h{m:D2}";
             }
         }
-        public string TotalRecebidoFormatado => TotalRecebido.ToString("C2", new System.Globalization.CultureInfo("pt-BR"));
-        public string TotalPendenteFormatado => TotalPendente.ToString("C2", new System.Globalization.CultureInfo("pt-BR"));
+        private static readonly System.Globalization.CultureInfo _culturePtBr = new("pt-BR");
+        public string TotalRecebidoFormatado => TotalRecebido.ToString("C2", _culturePtBr);
+        public string TotalPendenteFormatado => TotalPendente.ToString("C2", _culturePtBr);
+        public string TotalPendenteAnoFormatado => TotalPendenteAno.ToString("C2", _culturePtBr);
     }
 }

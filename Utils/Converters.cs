@@ -11,18 +11,33 @@ namespace GestaoAulas.Utils
     /// </summary>
     public class StatusToBrushConverter : IValueConverter
     {
+        // Fix 2.2: Brushes estáticos e frozen evitam alocação por célula do DataGrid
+        private static readonly SolidColorBrush PagoBrush;
+        private static readonly SolidColorBrush PendenteBrush;
+        private static readonly SolidColorBrush DefaultBrush;
+
+        static StatusToBrushConverter()
+        {
+            PagoBrush = new SolidColorBrush(Color.FromRgb(34, 197, 94));
+            PagoBrush.Freeze();
+            PendenteBrush = new SolidColorBrush(Color.FromRgb(245, 158, 11));
+            PendenteBrush.Freeze();
+            DefaultBrush = new SolidColorBrush(Color.FromRgb(110, 118, 129));
+            DefaultBrush.Freeze();
+        }
+
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is string status)
             {
                 return status switch
                 {
-                    "Pago" => new SolidColorBrush(Color.FromRgb(34, 197, 94)),      // Verde
-                    "Pendente" => new SolidColorBrush(Color.FromRgb(245, 158, 11)), // Amarelo
-                    _ => new SolidColorBrush(Color.FromRgb(110, 118, 129))          // Cinza
+                    "Pago" => PagoBrush,
+                    "Pendente" => PendenteBrush,
+                    _ => DefaultBrush
                 };
             }
-            return new SolidColorBrush(Colors.Gray);
+            return DefaultBrush;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

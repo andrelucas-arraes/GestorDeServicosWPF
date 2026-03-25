@@ -17,6 +17,7 @@ bld/
 # --- Project Specific Outpus ---
 publish/
 publish_portable/
+publish_standalone/
 Export/
 [Ll]og/
 [Ll]ogs/

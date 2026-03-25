@@ -13,7 +13,12 @@ namespace GestaoAulas.Views
         {
             InitializeComponent();
             // Permite arrastar a janela WindowStyle=None (Fix #13)
-            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) DragMove(); };
+            // Fix 3.2: try-catch protege contra InvalidOperationException (condição de corrida com MouseButtonState)
+            MouseLeftButtonDown += (s, e) =>
+            {
+                try { if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed) DragMove(); }
+                catch (InvalidOperationException) { /* Mouse não está mais pressionado ou janela não visível */ }
+            };
         }
 
         public static MessageBoxResult Show(Window owner, string message, string caption, MessageBoxButton button, MessageBoxImage icon)

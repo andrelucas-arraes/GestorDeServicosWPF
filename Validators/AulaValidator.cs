@@ -16,9 +16,9 @@ namespace GestaoAulas.Validators
                 .NotEmpty().WithMessage("A data é obrigatória.")
                 .Must(ValidarAnoRazoavel).WithMessage("Ano inválido (muito distante).");
 
-            RuleFor(x => x.Duracao)
-                .GreaterThan(0).When(x => x.Categoria == "Aula")
-                .WithMessage("A duração deve ser maior que zero.");
+            RuleFor(x => x.Valor)
+                .GreaterThanOrEqualTo(0)
+                .WithMessage("O valor não pode ser negativo.");
 
             RuleFor(x => x.Status)
                 .Must(x => x == "Pendente" || x == "Pago")

@@ -34,7 +34,9 @@ namespace GestaoAulas.Infrastructure
 
         public override void SetValue(IDbDataParameter parameter, decimal value)
         {
-            parameter.Value = value;
+            // Fix 5.6: Envia como string InvariantCulture, consistente com InserirAsync/AtualizarAsync
+            // que também convertem decimal para string para preservar precisão financeira
+            parameter.Value = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

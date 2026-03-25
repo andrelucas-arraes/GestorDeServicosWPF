@@ -17,6 +17,17 @@ namespace GestaoAulas
 
             // Inicializa campo de data com hoje
             txtNovaData.Text = DateTime.Now.ToString("dd/MM/yyyy");
+
+            Loaded += async (s, e) =>
+            {
+                try { await viewModel.InitializeAsync(); }
+                catch (Exception)
+                {
+                    GestaoAulas.Views.CustomMessageBox.Show(
+                        "Erro ao carregar dados iniciais. Reinicie o aplicativo.",
+                        "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
         }
 
         private void DataGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -25,82 +36,6 @@ namespace GestaoAulas
             {
                 if (vm.EditarAulaCommand.CanExecute(null))
                     vm.EditarAulaCommand.Execute(null);
-            }
-        }
-
-        /// <summary>
-        /// Formatação automática de duração (H:MM) ao digitar.
-        /// </summary>
-        private void Duracao_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                // Só aceita dígitos
-                if (!char.IsDigit(e.Text, 0))
-                {
-                    e.Handled = true;
-                    return;
-                }
-
-                string currentText = textBox.Text;
-                string digits = new string(currentText.Where(char.IsDigit).ToArray());
-                
-                // Limita a 4 dígitos (ex: 10:30 = 1030)
-                if (digits.Length >= 4)
-                {
-                    e.Handled = true;
-                    return;
-                }
-                
-                digits += e.Text;
-                
-                // Formata como H:MM
-                textBox.Text = FormatarDuracao(digits);
-                textBox.CaretIndex = textBox.Text.Length;
-                
-                e.Handled = true;
-            }
-        }
-
-        /// <summary>
-        /// Trata backspace no campo de duração.
-        /// </summary>
-        private void Duracao_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (sender is TextBox textBox)
-            {
-                if (e.Key == Key.Back)
-                {
-                    string text = textBox.Text;
-                    if (string.IsNullOrEmpty(text)) return;
-
-                    string digits = new string(text.Where(char.IsDigit).ToArray());
-                    if (digits.Length > 0)
-                    {
-                        digits = digits.Substring(0, digits.Length - 1);
-                    }
-
-                    textBox.Text = FormatarDuracao(digits);
-                    textBox.CaretIndex = textBox.Text.Length;
-                    e.Handled = true;
-                }
-                else if (e.Key == Key.Enter)
-                {
-                    // Valida a data antes de adicionar (Fix #11)
-                    if (!FormatUtils.TryParseData(txtNovaData.Text, out _))
-                    {
-                        GestaoAulas.Views.CustomMessageBox.Show(
-                            "Data inválida ou incompleta. Corrija antes de adicionar.",
-                            "Validação",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
-                        txtNovaData.Focus();
-                        e.Handled = true;
-                        return;
-                    }
-                    Adicionar_Click(null!, null!);
-                    e.Handled = true;
-                }
             }
         }
 
@@ -116,7 +51,11 @@ namespace GestaoAulas
                 string digits = new string(textBox.Text.Where(char.IsDigit).ToArray());
                 if (digits.Length >= 8) { e.Handled = true; return; }
 
-                FormatUtils.MascaraData(textBox);
+                digits += e.Text;
+                textBox.Text = FormatarData(digits);
+                textBox.CaretIndex = textBox.Text.Length;
+                
+                e.Handled = true;
             }
         }
 
@@ -126,28 +65,47 @@ namespace GestaoAulas
             {
                 FormatUtils.MascaraData(textBox, true);
             }
+            else if (e.Key == Key.Enter)
+            {
+                if (!FormatUtils.TryParseData(txtNovaData.Text, out _))
+                {
+                    GestaoAulas.Views.CustomMessageBox.Show(
+                        "Data inválida ou incompleta. Corrija antes de adicionar.",
+                        "Validação",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    txtNovaData.Focus();
+                    e.Handled = true;
+                    return;
+                }
+                Adicionar_Click(null!, null!);
+                e.Handled = true;
+            }
         }
 
         /// <summary>
-        /// Formata dígitos como duração H:MM.
+        /// Formata dígitos como data DD/MM/AAAA.
         /// </summary>
-        private static string FormatarDuracao(string digits)
+        private static string FormatarData(string digits)
         {
             if (string.IsNullOrEmpty(digits)) return "";
             
-            // Se tiver 3+ dígitos, formata como H:MM
-            if (digits.Length >= 3)
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < digits.Length; i++)
             {
-                return digits.Substring(0, digits.Length - 2) + ":" + digits.Substring(digits.Length - 2);
+                sb.Append(digits[i]);
+                if ((i == 1 || i == 3) && i < digits.Length - 1)
+                {
+                    sb.Append('/');
+                }
             }
-            return digits;
+            return sb.ToString();
         }
 
         private void Adicionar_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is MainViewModel vm)
             {
-                // Tenta parsear a data do TextBox antes de rodar o comando
                 if (FormatUtils.TryParseData(txtNovaData.Text, out DateTime data))
                 {
                     vm.NovaData = data;
@@ -156,7 +114,6 @@ namespace GestaoAulas
                 if (vm.AdicionarAulaCommand.CanExecute(null))
                 {
                     vm.AdicionarAulaCommand.Execute(null);
-                    // Após adicionar, limpa ou reseta a data (o VM já reseta para hoje, vamos sincronizar)
                     txtNovaData.Text = DateTime.Now.ToString("dd/MM/yyyy");
                 }
             }
