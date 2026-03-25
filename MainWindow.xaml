@@ -44,7 +44,7 @@
                        VerticalAlignment="Center"/>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Content="⚙ Configurações" 
+                <Button Content="Configurações" 
                         Command="{Binding AbrirConfiguracoesCommand}"
                         Style="{StaticResource MaterialDesignOutlinedButton}" 
                         Foreground="White"
@@ -53,7 +53,7 @@
                         Height="40"
                         Padding="16,0"
                         Margin="0,0,12,0"/>
-                <Button Content="📥 Exportar Dados" 
+                <Button Content="Exportar Dados" 
                         Command="{Binding ExportarDadosCommand}"
                         Style="{StaticResource MaterialDesignOutlinedButton}"
                         Foreground="White"
@@ -62,7 +62,7 @@
                         Height="40"
                         Padding="16,0"
                         Margin="0,0,12,0"/>
-                <Button Content="📊 Ver Análises" 
+                <Button Content="Ver Análises" 
                         Command="{Binding AbrirAnalisesCommand}"
                         Style="{StaticResource MaterialDesignOutlinedButton}"
                         Foreground="#a78bfa"

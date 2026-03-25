@@ -10,9 +10,12 @@
     <StartupObject>GestaoAulas.App</StartupObject>
     <AssemblyName>GestorDeServicos</AssemblyName>
     <RootNamespace>GestaoAulas</RootNamespace>
-    <Version>2.1.0</Version>
+    <Version>2.1.$([System.DateTime]::Now.ToString("Mdd")).$([System.DateTime]::Now.ToString("HHmm"))</Version>
     <Authors>Gestor de Serviços</Authors>
     <Description>Sistema de Gestão de Serviços e Aulas - Versão WPF</Description>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
   <ItemGroup>

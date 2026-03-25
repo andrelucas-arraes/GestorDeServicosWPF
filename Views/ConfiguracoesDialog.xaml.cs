@@ -10,6 +10,7 @@ using GestaoAulas.Models;
 using GestaoAulas.Repositories;
 using GestaoAulas.Utils;
 using Microsoft.Win32;
+using System.Diagnostics;
 
 namespace GestaoAulas.Views
 {
@@ -31,6 +32,15 @@ namespace GestaoAulas.Views
             
             CarregarConfiguracoes();
             CarregarCategoriasAsync();
+            
+            // Versão dinâmica baseada na compilação do .exe
+            string exeAtual = Environment.ProcessPath;
+            if (!string.IsNullOrEmpty(exeAtual) && File.Exists(exeAtual))
+            {
+                var versaoInfo = FileVersionInfo.GetVersionInfo(exeAtual);
+                string versao = versaoInfo.FileVersion ?? "2.1.0";
+                txtVersao.Text = $"Versão {versao}";
+            }
         }
 
         private async void CarregarCategoriasAsync()
@@ -259,6 +269,84 @@ namespace GestaoAulas.Views
                 // Salva diretamente
                 BackupManager.Instance.CaminhoBackupExterno = dialog.SelectedPath;
                 BackupManager.Instance.SalvarConfiguracoes();
+            }
+        }
+
+        private void AtualizarAplicativo_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1. Caminho onde o novo .exe é gerado
+                string caminhoDoNovoExe = @"C:\Users\Samsung\Documents\04. Desenvolvimento\Projetos Pessoais\GestorDeServicosWPF - Projeto novo\publish_standalone"; 
+        
+                // 2. Pasta onde o app em uso está rodando
+                string exeAtual = Environment.ProcessPath;
+                string pastaAtual = Path.GetDirectoryName(exeAtual) ?? AppDomain.CurrentDomain.BaseDirectory;
+                string nomeDoExe = Path.GetFileName(exeAtual) ?? "GestorDeServicos.exe";
+
+                // 3. Verifica se a pasta do código novo existe
+                if (!Directory.Exists(caminhoDoNovoExe))
+                {
+                    CustomMessageBox.Show("Não encontrei os arquivos de atualização na pasta do projeto.\n\nVerifique se você publicou o projeto antes.", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // 3.1. Verifica se realmente tem uma versão mais nova disponível
+                string exeNovo = Path.Combine(caminhoDoNovoExe, nomeDoExe);
+                
+                if (File.Exists(exeNovo) && File.Exists(exeAtual))
+                {
+                    try
+                    {
+                        var versaoNova = Version.Parse(FileVersionInfo.GetVersionInfo(exeNovo).FileVersion ?? "0.0.0.0");
+                        var versaoAtual = Version.Parse(FileVersionInfo.GetVersionInfo(exeAtual).FileVersion ?? "0.0.0.0");
+
+                        // Se a versão do EXE novo for igual ou menor, não tem atualização
+                        if (versaoNova <= versaoAtual)
+                        {
+                            CustomMessageBox.Show($"Você já está na versão mais recente do aplicativo!\n\nVersão atual: {versaoAtual}", "Atualizacao", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        // Ignorar falha no parse
+                    }
+                }
+
+                var resultado = CustomMessageBox.Show("Nova atualização disponível!\n\nDeseja aplicar a atualização agora? O aplicativo será reiniciado.", "Atualização", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (resultado != MessageBoxResult.Yes) return;
+
+                // 4. Cria o roteiro do arquivo .bat temporário
+                string caminhoBat = Path.Combine(Path.GetTempPath(), "atualizador_gestor.bat");
+
+                string scriptBat = $@"
+@echo off
+echo Atualizando o Sistema, por favor, aguarde...
+timeout /t 3 /nobreak > NUL
+xcopy /Y /E /C /F ""{caminhoDoNovoExe}\*.*"" ""{pastaAtual}""
+start """" ""{Path.Combine(pastaAtual, nomeDoExe)}"" --atualizado
+del ""%~f0""
+";
+
+                // 5. Salva e roda o BAT
+                File.WriteAllText(caminhoBat, scriptBat);
+
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = caminhoBat,
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Minimized
+                };
+                Process.Start(psi);
+
+                // 6. FECHA O APLICATIVO ATUAL para o .bat poder substituir o .exe
+                Application.Current.Shutdown();
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "Erro ao atualizar aplicativo");
+                CustomMessageBox.Show($"Erro ao tentar atualizar: {ex.Message}", "Erro", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -9,6 +9,7 @@ using GestaoAulas.Repositories;
 using GestaoAulas.Services;
 using GestaoAulas.ViewModels;
 using GestaoAulas.Validators;
+using GestaoAulas.Views;
 using FluentValidation;
 
 namespace GestaoAulas
@@ -209,6 +210,11 @@ namespace GestaoAulas
 
             var startupForm = AppHost.Services.GetRequiredService<MainWindow>();
             startupForm.Show();
+            
+            if (e.Args != null && Array.IndexOf(e.Args, "--atualizado") >= 0)
+            {
+                CustomMessageBox.Show(startupForm, "A atualização foi concluída com sucesso! Você já está na versão mais recente.", "Atualização Concluída", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
             
             base.OnStartup(e);
         }

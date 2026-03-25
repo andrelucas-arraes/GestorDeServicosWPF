@@ -1,20 +1,28 @@
-## Complete .gitignore for WPF/C# Projects
+## Complete .gitignore for WPF/C# (.NET 8) Projects
 
-# --- Build results ---
+# =============================================================================
+# Build Results
+# =============================================================================
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
 x64/
 x86/
-[Ww][In][Nn]32/
+[Ww][Ii][Nn]32/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/
 [Bb]in/
 [Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
 
-# --- Project Specific Outpus ---
+# =============================================================================
+# Project-Specific Outputs
+# =============================================================================
 publish/
 publish_portable/
 publish_standalone/
@@ -23,7 +31,15 @@ Export/
 [Ll]ogs/
 *.log
 
-# --- Visual Studio ---
+# Temp/scratch files
+test.cs
+*.tmp
+*.bak
+*~
+
+# =============================================================================
+# Visual Studio
+# =============================================================================
 .vs/
 *.user
 *.userosscache
@@ -34,38 +50,101 @@ Export/
 *.opendb
 *.db-shm
 *.db-wal
+*.sln.iml
 
-# --- MSTest / Unit Testing ---
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
+# Visual Studio auto-generated files
+Generated\ Files/
 
-# --- VS Code ---
+# Crash logs
+ServiceFabricApplications.log
+
+# =============================================================================
+# Visual Studio Code
+# =============================================================================
 .vscode/
 *.code-workspace
 
-# --- JetBrains (Rider / ReSharper) ---
+# =============================================================================
+# JetBrains (Rider / ReSharper)
+# =============================================================================
 .idea/
 _ReSharper*/
 *.[Rr]e[Ss]harper
 *.DotSettings.user
 
-# --- NuGet ---
+# =============================================================================
+# NuGet
+# =============================================================================
 *.nupkg
 *.snupkg
-# NuGet.config (Keep if it has sources, but manually remove secrets)
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+project.lock.json
 
-# --- Databases ---
+# =============================================================================
+# MSTest / Unit Testing
+# =============================================================================
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+*.coverage
+*.coveragexml
+
+# =============================================================================
+# Databases (SQLite)
+# =============================================================================
 *.db
 *.sqlitedb
 *.sqlite
+*.db-journal
 
-# --- Mono / Xamarin ---
+# =============================================================================
+# Mono / Xamarin
+# =============================================================================
 *.userprefs
 mono_crash.*
 
-# --- OS Specific ---
+# =============================================================================
+# OS-Specific Files
+# =============================================================================
+
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
 Desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
 .DS_Store
-*.bak
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Linux
 *~
+.directory
+.Trash-*
+
+# =============================================================================
+# Application Data / User Settings
+# =============================================================================
+backup_config.txt
+DevData/
+
+# =============================================================================
+# Gemini / AI Assistants
+# =============================================================================
+.gemini/
+.agent/
+.agents/
+_agent/
+_agents/

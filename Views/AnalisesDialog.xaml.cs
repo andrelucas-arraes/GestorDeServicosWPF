@@ -19,6 +19,25 @@ namespace GestaoAulas.Views
         private readonly List<Aula> _aulas;
         private static readonly CultureInfo _culturePtBr = new("pt-BR");
 
+        // Paleta de cores consistente
+        private static readonly SKColor CorVerde = new(34, 197, 94);    // Pago
+        private static readonly SKColor CorLaranja = new(249, 115, 22); // Pendente
+        private static readonly SKColor CorAzul = new(59, 130, 246);    // Receita
+        private static readonly SKColor CorRoxo = new(167, 139, 250);   // Destaques
+        private static readonly SKColor CorTextoEixo = new(148, 163, 184);
+
+        private static readonly SKColor[] CoresCategorias = new[]
+        {
+            new SKColor(99, 102, 241),   // Indigo
+            new SKColor(16, 185, 129),   // Verde
+            new SKColor(249, 115, 22),   // Laranja
+            new SKColor(167, 139, 250),  // Roxo
+            new SKColor(236, 72, 153),   // Rosa
+            new SKColor(234, 179, 8),    // Amarelo
+            new SKColor(20, 184, 166),   // Teal
+            new SKColor(239, 68, 68),    // Vermelho
+        };
+
         public AnalisesDialog(List<Aula> aulas)
         {
             InitializeComponent();
@@ -26,11 +45,18 @@ namespace GestaoAulas.Views
 
             Loaded += (s, e) =>
             {
-                CarregarResumo();
-                CarregarGraficoReceitaMensal();
-                CarregarGraficoCategoria();
-                CarregarGraficoStatus();
-                CarregarGraficoTopClientes();
+                try
+                {
+                    CarregarResumo();
+                    CarregarGraficoReceitaMensal();
+                    CarregarGraficoCategoria();
+                    CarregarGraficoStatus();
+                    CarregarGraficoTopClientes();
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Error(ex, "Erro ao carregar análises");
+                }
             };
         }
 
@@ -64,20 +90,27 @@ namespace GestaoAulas.Views
                     .TakeLast(12)
                     .ToList();
 
-                if (dadosPorMes.Count == 0) return;
+                if (dadosPorMes.Count == 0)
+                {
+                    txtSemDadosReceita.Visibility = Visibility.Visible;
+                    chartReceitaMensal.Visibility = Visibility.Collapsed;
+                    return;
+                }
 
                 chartReceitaMensal.Series = new ISeries[]
                 {
                     new ColumnSeries<double>
                     {
                         Values = dadosPorMes.Select(d => d.Valor).ToArray(),
-                        Fill = new SolidColorPaint(new SKColor(59, 130, 246)),
+                        Fill = new SolidColorPaint(CorAzul),
                         Name = "Receita",
-                        MaxBarWidth = 40,
+                        MaxBarWidth = 50,
+                        Padding = 8,
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
-                        DataLabelsSize = 11,
-                        DataLabelsFormatter = point => point.Model.ToString("C0", _culturePtBr),
-                        YToolTipLabelFormatter = point => point.Model.ToString("C2", _culturePtBr)
+                        DataLabelsSize = 12,
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.Top,
+                        DataLabelsFormatter = point => FormatarMoeda(point.Model, "C0"),
+                        YToolTipLabelFormatter = point => FormatarMoeda(point.Model, "C2")
                     }
                 };
 
@@ -86,9 +119,11 @@ namespace GestaoAulas.Views
                     new Axis
                     {
                         Labels = dadosPorMes.Select(d => d.Label).ToArray(),
-                        LabelsPaint = new SolidColorPaint(new SKColor(148, 163, 184)),
-                        TextSize = 11,
-                        MinStep = 1
+                        LabelsPaint = new SolidColorPaint(CorTextoEixo),
+                        TextSize = 12,
+                        MinStep = 1,
+                        ForceStepToMin = true,
+                        LabelsRotation = dadosPorMes.Count > 6 ? 45 : 0
                     }
                 };
 
@@ -96,12 +131,15 @@ namespace GestaoAulas.Views
                 {
                     new Axis
                     {
-                        LabelsPaint = new SolidColorPaint(new SKColor(148, 163, 184)),
+                        LabelsPaint = new SolidColorPaint(CorTextoEixo),
                         TextSize = 11,
-                        Labeler = (value) => value.ToString("C0", _culturePtBr),
+                        Labeler = value => FormatarMoeda(value, "C0"),
                         MinLimit = 0
                     }
                 };
+
+                chartReceitaMensal.TooltipBackgroundPaint = new SolidColorPaint(new SKColor(30, 41, 59));
+                chartReceitaMensal.TooltipTextPaint = new SolidColorPaint(SKColors.White);
             }
             catch (Exception ex)
             {
@@ -114,7 +152,7 @@ namespace GestaoAulas.Views
             try
             {
                 var dadosPorCategoria = _aulas
-                    .GroupBy(a => a.Categoria)
+                    .GroupBy(a => string.IsNullOrWhiteSpace(a.Categoria) ? "Sem Categoria" : a.Categoria)
                     .Select(g => new
                     {
                         Categoria = g.Key,
@@ -124,40 +162,37 @@ namespace GestaoAulas.Views
                     .OrderByDescending(d => d.Valor)
                     .ToList();
 
-                if (dadosPorCategoria.Count == 0) return;
-
-                var cores = new SKColor[]
+                if (dadosPorCategoria.Count == 0)
                 {
-                    new SKColor(59, 130, 246),   // Azul
-                    new SKColor(16, 185, 129),   // Verde
-                    new SKColor(249, 115, 22),   // Laranja
-                    new SKColor(167, 139, 250),  // Roxo
-                    new SKColor(236, 72, 153),   // Rosa
-                    new SKColor(234, 179, 8),    // Amarelo
-                    new SKColor(20, 184, 166),   // Teal
-                    new SKColor(239, 68, 68),    // Vermelho
-                };
+                    txtSemDadosCategoria.Visibility = Visibility.Visible;
+                    chartCategoria.Visibility = Visibility.Collapsed;
+                    return;
+                }
 
                 var series = new List<ISeries>();
                 for (int i = 0; i < dadosPorCategoria.Count; i++)
                 {
                     var d = dadosPorCategoria[i];
-                    var cor = cores[i % cores.Length];
+                    var cor = CoresCategorias[i % CoresCategorias.Length];
                     series.Add(new PieSeries<double>
                     {
                         Values = new[] { d.Valor },
                         Name = $"{d.Categoria} ({d.Count})",
                         Fill = new SolidColorPaint(cor),
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
-                        DataLabelsSize = 12,
-                        DataLabelsFormatter = point => point.Model.ToString("C2", _culturePtBr),
-                        ToolTipLabelFormatter = point => point.Model.ToString("C2", _culturePtBr)
+                        DataLabelsSize = 13,
+                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                        DataLabelsFormatter = point => FormatarMoeda(point.Model, "C2"),
+                        ToolTipLabelFormatter = point => $"{d.Categoria}: {FormatarMoeda(point.Model, "C2")}"
                     });
                 }
 
                 chartCategoria.Series = series;
                 chartCategoria.LegendPosition = LiveChartsCore.Measure.LegendPosition.Right;
                 chartCategoria.LegendTextPaint = new SolidColorPaint(SKColors.White);
+                chartCategoria.LegendTextSize = 13;
+                chartCategoria.TooltipBackgroundPaint = new SolidColorPaint(new SKColor(30, 41, 59));
+                chartCategoria.TooltipTextPaint = new SolidColorPaint(SKColors.White);
             }
             catch (Exception ex)
             {
@@ -174,7 +209,12 @@ namespace GestaoAulas.Views
                 var qtdPagos = _aulas.Count(a => a.Status == "Pago");
                 var qtdPendentes = _aulas.Count(a => a.Status == "Pendente");
 
-                if (pagos + pendentes == 0) return;
+                if (pagos + pendentes == 0)
+                {
+                    txtSemDadosStatus.Visibility = Visibility.Visible;
+                    chartStatus.Visibility = Visibility.Collapsed;
+                    return;
+                }
 
                 var series = new List<ISeries>();
 
@@ -184,11 +224,12 @@ namespace GestaoAulas.Views
                     {
                         Values = new[] { pagos },
                         Name = $"Pago ({qtdPagos})",
-                        Fill = new SolidColorPaint(new SKColor(34, 197, 94)),
+                        Fill = new SolidColorPaint(CorVerde),
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
-                        DataLabelsSize = 13,
-                        DataLabelsFormatter = point => point.Model.ToString("C2", _culturePtBr),
-                        ToolTipLabelFormatter = point => point.Model.ToString("C2", _culturePtBr)
+                        DataLabelsSize = 14,
+                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                        DataLabelsFormatter = point => FormatarMoeda(point.Model, "C2"),
+                        ToolTipLabelFormatter = point => $"Pago: {FormatarMoeda(point.Model, "C2")}"
                     });
                 }
                 
@@ -198,17 +239,21 @@ namespace GestaoAulas.Views
                     {
                         Values = new[] { pendentes },
                         Name = $"Pendente ({qtdPendentes})",
-                        Fill = new SolidColorPaint(new SKColor(249, 115, 22)),
+                        Fill = new SolidColorPaint(CorLaranja),
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
-                        DataLabelsSize = 13,
-                        DataLabelsFormatter = point => point.Model.ToString("C2", _culturePtBr),
-                        ToolTipLabelFormatter = point => point.Model.ToString("C2", _culturePtBr)
+                        DataLabelsSize = 14,
+                        DataLabelsPosition = LiveChartsCore.Measure.PolarLabelsPosition.Middle,
+                        DataLabelsFormatter = point => FormatarMoeda(point.Model, "C2"),
+                        ToolTipLabelFormatter = point => $"Pendente: {FormatarMoeda(point.Model, "C2")}"
                     });
                 }
 
                 chartStatus.Series = series;
                 chartStatus.LegendPosition = LiveChartsCore.Measure.LegendPosition.Right;
                 chartStatus.LegendTextPaint = new SolidColorPaint(SKColors.White);
+                chartStatus.LegendTextSize = 13;
+                chartStatus.TooltipBackgroundPaint = new SolidColorPaint(new SKColor(30, 41, 59));
+                chartStatus.TooltipTextPaint = new SolidColorPaint(SKColors.White);
             }
             catch (Exception ex)
             {
@@ -221,10 +266,11 @@ namespace GestaoAulas.Views
             try
             {
                 var topClientes = _aulas
-                    .GroupBy(a => a.NomeAula)
+                    .GroupBy(a => string.IsNullOrWhiteSpace(a.NomeAula) ? "Sem Descrição" : a.NomeAula)
                     .Select(g => new
                     {
-                        Nome = string.IsNullOrWhiteSpace(g.Key) ? "Sem Descrição" : (g.Key.Length > 15 ? g.Key.Substring(0, 15) + "..." : g.Key),
+                        NomeCompleto = g.Key,
+                        Nome = g.Key.Length > 25 ? g.Key.Substring(0, 22) + "..." : g.Key,
                         Valor = (double)g.Sum(a => a.Valor)
                     })
                     .OrderByDescending(d => d.Valor)
@@ -232,20 +278,31 @@ namespace GestaoAulas.Views
                     .Reverse()
                     .ToList();
 
-                if (topClientes.Count == 0) return;
+                if (topClientes.Count == 0)
+                {
+                    txtSemDadosTop.Visibility = Visibility.Visible;
+                    chartTopClientes.Visibility = Visibility.Collapsed;
+                    return;
+                }
+
+                // Calcular altura dinâmica baseada na quantidade de itens
+                var alturaMinima = Math.Max(280, topClientes.Count * 38);
+                chartTopClientes.MinHeight = alturaMinima;
 
                 chartTopClientes.Series = new ISeries[]
                 {
                     new RowSeries<double>
                     {
                         Values = topClientes.Select(d => d.Valor).ToArray(),
-                        Fill = new SolidColorPaint(new SKColor(167, 139, 250)),
+                        Fill = new SolidColorPaint(CorRoxo),
                         Name = "Valor Total",
-                        MaxBarWidth = 30,
+                        MaxBarWidth = 28,
+                        Padding = 6,
                         DataLabelsPaint = new SolidColorPaint(SKColors.White),
                         DataLabelsSize = 11,
-                        DataLabelsFormatter = point => point.Model.ToString("C0", _culturePtBr),
-                        XToolTipLabelFormatter = point => point.Model.ToString("C2", _culturePtBr)
+                        DataLabelsPosition = LiveChartsCore.Measure.DataLabelsPosition.End,
+                        DataLabelsFormatter = point => FormatarMoeda(point.Model, "C0"),
+                        XToolTipLabelFormatter = point => FormatarMoeda(point.Model, "C2")
                     }
                 };
 
@@ -254,9 +311,11 @@ namespace GestaoAulas.Views
                     new Axis
                     {
                         Labels = topClientes.Select(d => d.Nome).ToArray(),
-                        LabelsPaint = new SolidColorPaint(new SKColor(148, 163, 184)),
+                        LabelsPaint = new SolidColorPaint(CorTextoEixo),
                         TextSize = 11,
-                        MinStep = 1
+                        MinStep = 1,
+                        ForceStepToMin = true,
+                        SeparatorsPaint = new SolidColorPaint(new SKColor(51, 65, 85)) { StrokeThickness = 0.5f }
                     }
                 };
 
@@ -264,17 +323,28 @@ namespace GestaoAulas.Views
                 {
                     new Axis
                     {
-                        LabelsPaint = new SolidColorPaint(new SKColor(148, 163, 184)),
+                        LabelsPaint = new SolidColorPaint(CorTextoEixo),
                         TextSize = 11,
-                        Labeler = (value) => value.ToString("C0", _culturePtBr),
+                        Labeler = value => FormatarMoeda(value, "C0"),
                         MinLimit = 0
                     }
                 };
+
+                chartTopClientes.TooltipBackgroundPaint = new SolidColorPaint(new SKColor(30, 41, 59));
+                chartTopClientes.TooltipTextPaint = new SolidColorPaint(SKColors.White);
             }
             catch (Exception ex)
             {
                 Serilog.Log.Error(ex, "Erro ao carregar gráfico de top clientes");
             }
+        }
+
+        /// <summary>
+        /// Formata um valor numérico como moeda brasileira.
+        /// </summary>
+        private static string FormatarMoeda(double valor, string formato)
+        {
+            return valor.ToString(formato, _culturePtBr);
         }
 
         private void Fechar_Click(object sender, RoutedEventArgs e)
